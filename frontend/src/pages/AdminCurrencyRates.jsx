@@ -199,7 +199,7 @@ export default function AdminCurrencyRates() {
   };
 
   const startEditRate = (rate) => {
-    setEditingRateId(rate._id);
+    setEditingRateId(rate.id);
     setEditRateData({ fromCode: rate.fromCode || '', toCode: rate.toCode || '', buyingPrice: rate.buyingPrice ?? '', sellingPrice: rate.sellingPrice ?? '', priceType: rate.priceType || 'fixed' });
     setShowCreateRate(true);
   };
@@ -297,7 +297,7 @@ export default function AdminCurrencyRates() {
               </thead>
               <tbody>
                 {exchangeRates.map(r => (
-                  <tr key={r._id}>
+                  <tr key={r.id}>
                     <td><strong>{r.fromCode}</strong></td>
                     <td>{r.toCode}</td>
                     <td>{r.buyingPrice ?? '—'}</td>
@@ -306,7 +306,7 @@ export default function AdminCurrencyRates() {
                     <td>
                       <div style={{display: 'flex', gap: 6}}>
                         <button className="action-btn view-btn" onClick={() => startEditRate(r)}>✏️</button>
-                        <button className="action-btn delete-btn" onClick={() => deleteRate(r._id)}>🗑️</button>
+                        <button className="action-btn delete-btn" onClick={() => deleteRate(r.id)}>🗑️</button>
                       </div>
                     </td>
                   </tr>
@@ -470,8 +470,8 @@ export default function AdminCurrencyRates() {
                     value={editingRateId ? (editRateData.buyingPrice ?? '') : (createRateData.buyingPrice ?? '')}
                     onChange={(e) => editingRateId ? setEditRateData(prev => ({...prev, buyingPrice: e.target.value})) : handleCreateRateChange('buyingPrice', e.target.value)}
                     className="form-input"
-                    placeholder={createRateData.priceType === 'percentage' ? 'e.g., 2.5' : 'e.g., 5800'}
-                    step="0.01"
+                    placeholder={createRateData.priceType === 'percentage' ? 'e.g., 2.5' : 'e.g., 5800 or 0.000172'}
+                    step="any"
                   />
                 </div>
 
@@ -482,8 +482,8 @@ export default function AdminCurrencyRates() {
                     value={editingRateId ? (editRateData.sellingPrice ?? '') : (createRateData.sellingPrice ?? '')}
                     onChange={(e) => editingRateId ? setEditRateData(prev => ({...prev, sellingPrice: e.target.value})) : handleCreateRateChange('sellingPrice', e.target.value)}
                     className="form-input"
-                    placeholder={createRateData.priceType === 'percentage' ? 'e.g., 1.5' : 'e.g., 5700'}
-                    step="0.01"
+                    placeholder={createRateData.priceType === 'percentage' ? 'e.g., 1.5' : 'e.g., 5700 or 0.000175'}
+                    step="any"
                   />
                 </div>
               </div>

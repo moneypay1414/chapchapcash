@@ -118,7 +118,7 @@ export default function Withdraw() {
 
       const withdrawAmount = parseFloat(amount);
       if (userInfo.balance < withdrawAmount) {
-        const errorMsg = `User has insufficient balance. Available: SSP ${userInfo.balance.toFixed(2)}`;
+        const errorMsg = `User has insufficient balance. Available: SSP ${(parseFloat(userInfo.balance) || 0).toFixed(2)}`;
         setError(errorMsg);
         setToast({ message: errorMsg, type: 'error' });
         setLoading(false);
@@ -126,7 +126,7 @@ export default function Withdraw() {
       }
 
       const { data } = await transactionAPI.withdraw({
-        agentId: userInfo._id,
+        agentId: userInfo.agentId,
         amount: withdrawAmount
       });
 
@@ -193,7 +193,7 @@ export default function Withdraw() {
                   <div className="mb-2">
                     <span className="text-muted">Available Balance: </span>
                     <span className="text-success font-weight-bold" style={{ fontSize: '18px' }}>
-                      SSP {userInfo.balance?.toFixed(2) || '0.00'}
+                      SSP {(parseFloat(userInfo.balance) || 0).toFixed(2)}
                     </span>
                   </div>
                 </div>
@@ -224,7 +224,7 @@ export default function Withdraw() {
                         min="0"
                         max={userInfo.balance || 0}
                       />
-                      <small className="text-muted">Max: SSP {userInfo.balance?.toFixed(2) || '0.00'}</small>
+                      <small className="text-muted">Max: SSP {(parseFloat(userInfo.balance) || 0).toFixed(2)}</small>
                     </div>
 
                     <button type="submit" className="btn btn-success btn-block btn-lg" disabled={loading || suspended}>

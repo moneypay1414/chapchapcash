@@ -151,7 +151,7 @@ export default function AgentDashboard() {
           <div className="stat-icon sent">📤</div>
           <div className="stat-content">
             <p className="stat-label">Money Sent</p>
-            <h3 className="stat-value">SSP {stats?.transfersSentAmount?.toFixed(2) || '0.00'}</h3>
+            <h3 className="stat-value">SSP {(Number(stats?.transfersSentAmount) || 0).toFixed(2)}</h3>
           </div>
         </div>
 
@@ -159,7 +159,7 @@ export default function AgentDashboard() {
           <div className="stat-icon received">📥</div>
           <div className="stat-content">
             <p className="stat-label">Withdrawn</p>
-            <h3 className="stat-value">SSP {stats?.withdrawalsCompletedAmount?.toFixed(2) || '0.00'}</h3>
+            <h3 className="stat-value">SSP {(Number(stats?.withdrawalsCompletedAmount) || 0).toFixed(2)}</h3>
           </div>
         </div>
 
@@ -167,7 +167,7 @@ export default function AgentDashboard() {
           <div className="stat-icon commission">💎</div>
           <div className="stat-content">
             <p className="stat-label">Commission Earned</p>
-            <h3 className="stat-value">SSP {stats?.commissionEarned?.toFixed(2) || '0.00'}</h3>
+            <h3 className="stat-value">SSP {(Number(stats?.commissionEarned) || 0).toFixed(2)}</h3>
           </div>
         </div>
         <div className="stat-card">
@@ -274,9 +274,9 @@ export default function AgentDashboard() {
                     <tr key={w._id || w.id}>
                       <td>{w.type === 'user_withdraw' ? (w.sender?.name || w.sender?.phone || 'User') : (w.receiver?.name || w.receiver?.phone || 'Agent')}</td>
                       <td>{w.type === 'user_withdraw' ? 'Pulled from user' : 'Withdrawal'}</td>
-                      <td>SSP {w.amount.toFixed(2)}</td>
-                      <td>SSP {(w.agentCommission ?? w.commission ?? 0).toFixed(2)}</td>
-                      <td>SSP {(w.companyCommission ?? 0).toFixed(2)}</td>
+                      <td>SSP {(parseFloat(w.amount) || 0).toFixed(2)}</td>
+                      <td>SSP {((parseFloat(w.agentCommission) ?? parseFloat(w.commission) ?? 0)).toFixed(2)}</td>
+                      <td>SSP {(parseFloat(w.companyCommission) ?? 0).toFixed(2)}</td>
                       <td><span className={`badge badge-${w.status === 'completed' ? 'success' : w.status === 'pending' ? 'warning' : 'danger'}`}>{w.status}</span></td>
                       <td>{new Date(w.createdAt).toLocaleString()}</td>
                       <td style={{ display: 'flex', gap: '4px' }}>
@@ -329,7 +329,7 @@ export default function AgentDashboard() {
                     <tr key={w._id || w.id}>
                       <td>{w.sender?.name || w.sender?.phone || 'Agent'}</td>
                       <td>Withdrawal</td>
-                      <td>SSP {w.amount.toFixed(2)}</td>
+                      <td>SSP {(parseFloat(w.amount) || 0).toFixed(2)}</td>
                       <td><span className={`badge badge-${w.status === 'completed' ? 'success' : w.status === 'pending' ? 'warning' : 'danger'}`}>{w.status}</span></td>
                       <td>{new Date(w.createdAt).toLocaleString()}</td>
                       <td style={{ display: 'flex', gap: '4px' }}>
@@ -384,7 +384,7 @@ export default function AgentDashboard() {
                       <td>{w.receiver?.name || w.receiver?.phone || 'Admin'}</td>
                       <td>{w.transactionId || 'N/A'}</td>
                       <td>{w.description || 'No description'}</td>
-                      <td>SSP {w.amount.toFixed(2)}</td>
+                      <td>SSP {(parseFloat(w.amount) || 0).toFixed(2)}</td>
                       <td><span className={`badge badge-${w.status === 'completed' ? 'success' : w.status === 'pending' ? 'warning' : 'danger'}`}>{w.status}</span></td>
                       <td>{new Date(w.createdAt).toLocaleString()}</td>
                       <td style={{ display: 'flex', gap: '4px' }}>
@@ -436,7 +436,7 @@ export default function AgentDashboard() {
                     <tr key={tx._id}>
                       <td>{tx.sender?.name || tx.sender?.phone || 'Unknown'}</td>
                       <td>{tx.type === 'user_withdraw' ? 'Pulled from user' : 'Transfer'}</td>
-                      <td>SSP {tx.amount.toFixed(2)}</td>
+                      <td>SSP {(parseFloat(tx.amount) || 0).toFixed(2)}</td>
                       <td>{new Date(tx.createdAt).toLocaleString()}</td>
                       <td style={{ display: 'flex', gap: '4px' }}>
                         <a href={`/agent/transactions?id=${tx._id}`} className="view-btn">View</a>

@@ -29,7 +29,7 @@ export default function Notifications() {
       await notificationAPI.markAsRead({ notificationId: id });
       markAsRead(id);
       setNotifications(notifications.map(n =>
-        n._id === id ? { ...n, isRead: true } : n
+        n.id === id ? { ...n, isRead: true } : n
       ));
     } catch (error) {
       console.error('Failed to mark as read:', error);
@@ -39,7 +39,7 @@ export default function Notifications() {
   const handleDelete = async (id) => {
     try {
       await notificationAPI.delete(id);
-      setNotifications(notifications.filter(n => n._id !== id));
+      setNotifications(notifications.filter(n => n.id !== id));
     } catch (error) {
       console.error('Failed to delete notification:', error);
     }
@@ -80,7 +80,7 @@ export default function Notifications() {
             <div className="notifications-list">
               {notifications.map(notif => (
                 <div 
-                  key={notif._id} 
+                  key={notif.id} 
                   className={`notification-item ${notif.isRead ? '' : 'unread'}`}
                 >
                   <div className="notification-icon">
@@ -97,14 +97,14 @@ export default function Notifications() {
                     {!notif.isRead && (
                       <button 
                         className="btn btn-sm btn-primary"
-                        onClick={() => handleMarkAsRead(notif._id)}
+                        onClick={() => handleMarkAsRead(notif.id)}
                       >
                         Mark as read
                       </button>
                     )}
                     <button 
                       className="btn btn-sm btn-delete"
-                      onClick={() => handleDelete(notif._id)}
+                      onClick={() => handleDelete(notif.id)}
                     >
                       Delete
                     </button>

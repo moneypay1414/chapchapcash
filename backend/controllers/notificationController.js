@@ -4,12 +4,15 @@ import { sendSMS } from '../utils/sms.js';
 
 export const getNotifications = async (req, res) => {
   try {
-    const notifications = await Notification.find({ recipient: req.userId })
-      .sort({ createdAt: -1 })
-      .limit(50);
+    const notifications = await Notification.findAll({
+      where: { recipientId: req.userId },
+      order: [['createdAt', 'DESC']],
+      limit: 50
+    });
 
     res.json(notifications);
   } catch (error) {
+    console.error('Notification error:', error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -18,13 +21,16 @@ export const markAsRead = async (req, res) => {
   try {
     const { notificationId } = req.body;
 
-    const notification = await Notification.findByIdAndUpdate(
-      notificationId,
+    const [updatedRowsCount, updatedRows] = await Notification.update(
       { isRead: true },
-      { new: true }
+      { where: { id: notificationId, recipientId: req.userId }, returning: true }
     );
 
-    res.json(notification);
+    if (updatedRowsCount === 0) {
+      return res.status(404).json({ message: 'Notification not found' });
+    }
+
+    res.json(updatedRows[0]);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -32,9 +38,9 @@ export const markAsRead = async (req, res) => {
 
 export const markAllAsRead = async (req, res) => {
   try {
-    await Notification.updateMany(
-      { recipient: req.userId, isRead: false },
-      { isRead: true }
+    await Notification.update(
+      { isRead: true },
+      { where: { recipientId: req.userId, isRead: false } }
     );
 
     res.json({ message: 'All notifications marked as read' });
@@ -47,16 +53,16 @@ export const sendNotificationToAll = async (req, res) => {
   try {
     const { title, message, type } = req.body;
 
-    const users = await User.find();
+    const users = await User.findAll();
 
     const notifications = users.map(user => ({
-      recipient: user._id,
+      recipientId: user.id,
       title,
       message,
       type: type || 'system'
     }));
 
-    await Notification.insertMany(notifications);
+    await Notification.bulkCreate(notifications);
 
     // Send SMS to all users
     try {
@@ -77,19 +83,17 @@ export const sendNotificationToUser = async (req, res) => {
   try {
     const { userId, title, message, type } = req.body;
 
-    const user = await User.findById(userId);
+    const user = await User.findByPk(userId);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    const notification = new Notification({
-      recipient: userId,
+    const notification = await Notification.create({
+      recipientId: userId,
       title,
       message,
       type: type || 'system'
     });
-
-    await notification.save();
 
     try {
       await sendSMS(user.phone, `MoneyPay: ${message}`);
@@ -107,7 +111,13 @@ export const deleteNotification = async (req, res) => {
   try {
     const { notificationId } = req.params;
 
-    await Notification.findByIdAndDelete(notificationId);
+    const deletedRowsCount = await Notification.destroy({
+      where: { id: notificationId, recipientId: req.userId }
+    });
+
+    if (deletedRowsCount === 0) {
+      return res.status(404).json({ message: 'Notification not found' });
+    }
 
     res.json({ message: 'Notification deleted' });
   } catch (error) {

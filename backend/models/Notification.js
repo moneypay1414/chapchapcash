@@ -1,36 +1,58 @@
-import mongoose from 'mongoose';
+import { DataTypes } from 'sequelize';
+import sequelize from '../config/database.js';
 
-const notificationSchema = new mongoose.Schema({
-  recipient: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
+const Notification = sequelize.define('Notification', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
+  },
+  recipientId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    references: {
+      model: 'Users',
+      key: 'id'
+    }
   },
   title: {
-    type: String,
-    required: true
+    type: DataTypes.STRING,
+    allowNull: false
   },
   message: {
-    type: String,
-    required: true
+    type: DataTypes.TEXT,
+    allowNull: false
   },
   type: {
-    type: String,
-    enum: ['transaction', 'system', 'alert', 'offer', 'withdrawal_request'],
-    default: 'system'
+    type: DataTypes.ENUM('transaction', 'system', 'alert', 'offer', 'withdrawal_request'),
+    defaultValue: 'system'
   },
   isRead: {
-    type: Boolean,
-    default: false
+    type: DataTypes.BOOLEAN,
+    defaultValue: false
   },
-  relatedTransaction: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Transaction'
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
+  relatedTransactionId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: {
+      model: 'Transactions',
+      key: 'id'
+    }
   }
+}, {
+  timestamps: true,
+  indexes: [
+    { fields: ['recipientId'] },
+    { fields: ['isRead'] },
+    { fields: ['type'] },
+    { fields: ['relatedTransactionId'] }
+  ]
 });
 
-export default mongoose.model('Notification', notificationSchema);
+// Define associations
+Notification.associate = (models) => {
+  Notification.belongsTo(models.User, { foreignKey: 'recipientId', as: 'recipient' });
+  Notification.belongsTo(models.Transaction, { foreignKey: 'relatedTransactionId', as: 'relatedTransaction' });
+};
+
+export default Notification;

@@ -5,7 +5,18 @@ import '../styles/print-receipt.css';
 export default function PrintReceipt({ transaction, onClose }) {
   if (!transaction) return null;
 
-  const handlePrint = () => {
+  const handleNativePrint = () => {
+    // Add print-specific class to body for CSS-based printing
+    document.body.classList.add('printing-receipt');
+    
+    // Use browser's native print
+    window.print();
+    
+    // Remove the class after printing
+    setTimeout(() => {
+      document.body.classList.remove('printing-receipt');
+    }, 1000);
+  };
     // Use hidden iframe for printing (works without popup permissions)
     const styles = `
   /* Inline print styles for A4 receipt - match browser display */
@@ -15,16 +26,61 @@ export default function PrintReceipt({ transaction, onClose }) {
   .receipt-content { padding: 20px; border: 3px solid #000; margin: 0; background: #fff; }
   .receipt-logo { text-align: center; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 2px solid #000; }
   .receipt-logo h1 { font-size: 24px; font-weight: bold; color: #000; margin: 5px 0; }
-  .receipt-section { margin-bottom: 15px; page-break-inside: avoid; }
-  .receipt-section h3 { font-size: 13px; font-weight: bold; color: #000; text-transform: uppercase; margin: 0 0 8px 0; padding-bottom: 4px; border-bottom: 2px solid #000; }
+  .receipt-section {
+    margin-bottom: 15px;
+    page-break-inside: avoid;
+    display: block;
+    visibility: visible;
+  }
+  .receipt-section h3 {
+    font-size: 13px;
+    font-weight: bold;
+    color: #000;
+    text-transform: uppercase;
+    margin: 0 0 8px 0;
+    padding-bottom: 4px;
+    border-bottom: 2px solid #000;
+    display: block;
+    visibility: visible;
+  }
   .receipt-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 12px; color: #000; line-height: 1.5; }
   .receipt-row .label { font-weight: bold; color: #000; flex: 0 0 40%; min-width: 100px; }
   .receipt-row .value { text-align: right; flex: 1; color: #000; margin-left: 10px; word-break: break-word; }
   .receipt-footer { text-align: center; padding-top: 15px; margin-top: 20px; border-top: 2px solid #000; color: #000; font-size: 11px; font-weight: bold; line-height: 1.5; }
   .receipt-footer p { margin: 5px 0; }
-  .receipt-table { width: 100%; border-collapse: collapse; margin: 12px 0; border: 2px solid #000; }
-  .receipt-table th { background: #000; color: #fff; padding: 8px 10px; text-align: left; font-weight: bold; font-size: 12px; border: 1px solid #000; line-height: 1.4; }
-  .receipt-table td { padding: 8px 10px; border: 1px solid #000; font-size: 12px; color: #000; font-weight: 500; line-height: 1.4; }
+  .receipt-table { 
+    width: 100%; 
+    border-collapse: collapse; 
+    margin: 12px 0; 
+    border: 2px solid #000; 
+    table-layout: fixed;
+    display: table;
+    visibility: visible;
+  }
+  .receipt-table th { 
+    background: #000; 
+    color: #fff; 
+    padding: 8px 10px; 
+    text-align: left; 
+    font-weight: bold; 
+    font-size: 12px; 
+    border: 1px solid #000; 
+    line-height: 1.4; 
+    display: table-cell;
+  }
+  .receipt-table td { 
+    padding: 8px 10px; 
+    border: 1px solid #000; 
+    font-size: 12px; 
+    color: #000; 
+    font-weight: 500; 
+    line-height: 1.4; 
+    display: table-cell;
+    word-wrap: break-word;
+  }
+  .receipt-table thead { display: table-header-group; }
+  .receipt-table tbody { display: table-row-group; }
+  .receipt-table tr { display: table-row; }
   .receipt-table .amount-cell { text-align: right; font-weight: bold; }
   .receipt-table tr:nth-child(even) { background: #f9f9f9; }
   .receipt-table tr.total-row { background: #000; color: #fff; font-weight: bold; }
@@ -34,6 +90,10 @@ export default function PrintReceipt({ transaction, onClose }) {
     html { margin: 0; padding: 0; }
     body { margin: 0; padding: 0; width: auto; height: auto; }
     .receipt-content { margin: 0; padding: 20px; width: auto; page-break-inside: avoid; }
+    .receipt-table { display: table !important; visibility: visible !important; }
+    .receipt-table th, .receipt-table td { display: table-cell !important; }
+    .receipt-table thead, .receipt-table tbody { display: table-header-group !important; }
+    .receipt-table tr { display: table-row !important; }
   }
   `;
 
@@ -58,9 +118,9 @@ export default function PrintReceipt({ transaction, onClose }) {
           <div class="receipt-section">
             <h3>Parties</h3>
             <div class="receipt-row"><span class="label">From:</span><span class="value">${transaction.sender?.name || transaction.sender?.phone || 'System'}</span></div>
-            ${transaction.senderLocation ? `<div class="receipt-row"><span class="label">From Location:</span><span class="value">${transaction.senderLocation.city}, ${transaction.senderLocation.country}</span></div>` : ''}
+            ${transaction.senderLocation ? `<div class="receipt-row"><span class="label">From Location:</span><span class="value">${transaction.senderLocation.city || 'Unknown'}, ${transaction.senderLocation.country || 'Unknown'}</span></div>` : ''}
             <div class="receipt-row"><span class="label">To:</span><span class="value">${transaction.receiver?.name || transaction.receiver?.phone || 'N/A'}</span></div>
-            ${transaction.receiverLocation ? `<div class="receipt-row"><span class="label">To Location:</span><span class="value">${transaction.receiverLocation.city}, ${transaction.receiverLocation.country}</span></div>` : ''}
+            ${transaction.receiverLocation ? `<div class="receipt-row"><span class="label">To Location:</span><span class="value">${transaction.receiverLocation.city || 'Unknown'}, ${transaction.receiverLocation.country || 'Unknown'}</span></div>` : ''}
           </div>
 
           <div class="receipt-section">
@@ -70,17 +130,15 @@ export default function PrintReceipt({ transaction, onClose }) {
                 <tr><th>Description</th><th>SSP</th></tr>
               </thead>
               <tbody>
-                <tr><td>Transaction Amount</td><td class="amount-cell">SSP ${ (transaction.amount || 0).toFixed(2) }</td></tr>
-                ${transaction.agentCommission !== undefined && transaction.agentCommission > 0 ? `
-                  <tr><td>Agent Commission (${transaction.agentCommissionPercent}%)</td><td class="amount-cell">SSP ${ (transaction.agentCommission || 0).toFixed(2) }</td></tr>
+                <tr><td>Transaction Amount</td><td class="amount-cell">SSP ${ (parseFloat(transaction.amount) || 0).toFixed(2) }</td></tr>
+                ${transaction.agentCommission !== undefined ? `
+                  <tr><td>Agent Commission (${transaction.agentCommissionPercent || 0}%)</td><td class="amount-cell">SSP ${ (parseFloat(transaction.agentCommission) || 0).toFixed(2) }</td></tr>
                 ` : ''}
-                ${transaction.companyCommission !== undefined && transaction.companyCommission > 0 ? `
-                  <tr><td>Company Commission (${transaction.companyCommissionPercent}%)</td><td class="amount-cell">SSP ${ (transaction.companyCommission || 0).toFixed(2) }</td></tr>
+                ${transaction.companyCommission !== undefined ? `
+                  <tr><td>Company Commission (${transaction.companyCommissionPercent || 0}%)</td><td class="amount-cell">SSP ${ (parseFloat(transaction.companyCommission) || 0).toFixed(2) }</td></tr>
                 ` : ''}
-                ${((transaction.agentCommission || 0) + (transaction.companyCommission || 0)) > 0 ? `
-                  <tr><td><strong>Total Commission Fee</strong></td><td class="amount-cell"><strong>SSP ${ ((transaction.agentCommission||0)+(transaction.companyCommission||0)).toFixed(2) }</strong></td></tr>
-                ` : ''}
-                <tr class="total-row"><td><strong>TOTAL USER PAYS</strong></td><td class="amount-cell"><strong>SSP ${ ((transaction.amount||0) + (transaction.agentCommission||0) + (transaction.companyCommission||0)).toFixed(2) }</strong></td></tr>
+                <tr><td><strong>Total Commission Fee</strong></td><td class="amount-cell"><strong>SSP ${ ((parseFloat(transaction.agentCommission)||0)+(parseFloat(transaction.companyCommission)||0)).toFixed(2) }</strong></td></tr>
+                <tr class="total-row"><td><strong>TOTAL USER PAYS</strong></td><td class="amount-cell"><strong>SSP ${ ((parseFloat(transaction.amount)||0) + (parseFloat(transaction.agentCommission)||0) + (parseFloat(transaction.companyCommission)||0)).toFixed(2) }</strong></td></tr>
               </tbody>
             </table>
           </div>
@@ -118,34 +176,54 @@ export default function PrintReceipt({ transaction, onClose }) {
       iframeDoc.write(html);
       iframeDoc.close();
 
+      console.log('Print iframe content written, HTML length:', html.length);
+
       // Wait for iframe content to fully load
       iframe.onload = () => {
+        console.log('Print iframe loaded successfully');
         setTimeout(() => {
           try {
             if (!printed) {
               printed = true;
+              console.log('Attempting to print...');
               iframe.contentWindow?.print();
             }
           } catch (err) {
             console.error('Printing failed:', err);
+            // Fallback: try direct print
+            try {
+              window.print();
+            } catch (fallbackErr) {
+              console.error('Fallback printing also failed:', fallbackErr);
+              alert('Printing failed. Please try using Ctrl+P (Cmd+P on Mac) to print this page.');
+            }
           }
           // Remove iframe after short delay to allow print dialog to open
           setTimeout(() => {
             if (document.body.contains(iframe)) document.body.removeChild(iframe);
           }, 500);
-        }, 300);
+        }, 500); // Increased timeout
       };
 
       // Fallback timeout if onload doesn't fire
       setTimeout(() => {
         if (document.body.contains(iframe)) {
+          console.log('Print iframe fallback timeout triggered');
           try {
             if (!printed) {
               printed = true;
+              console.log('Attempting fallback print...');
               iframe.contentWindow?.print();
             }
           } catch (err) {
             console.error('Printing failed (timeout fallback):', err);
+            // Fallback: try direct print
+            try {
+              window.print();
+            } catch (fallbackErr) {
+              console.error('Fallback printing also failed:', fallbackErr);
+              alert('Printing failed. Please try using Ctrl+P (Cmd+P on Mac) to print this page.');
+            }
           }
           setTimeout(() => {
             if (document.body.contains(iframe)) {
@@ -153,7 +231,7 @@ export default function PrintReceipt({ transaction, onClose }) {
             }
           }, 500);
         }
-      }, 2000);
+      }, 3000); // Increased fallback timeout
     } catch (err) {
       console.error('Error setting up iframe print:', err);
       if (document.body.contains(iframe)) {
@@ -227,7 +305,7 @@ export default function PrintReceipt({ transaction, onClose }) {
               <div className="receipt-row">
                 <span className="label">From Location:</span>
                 <span className="value">
-                  {transaction.senderLocation.city}, {transaction.senderLocation.country}
+                  {transaction.senderLocation.city || 'Unknown'}, {transaction.senderLocation.country || 'Unknown'}
                 </span>
               </div>
             )}
@@ -241,7 +319,7 @@ export default function PrintReceipt({ transaction, onClose }) {
               <div className="receipt-row">
                 <span className="label">To Location:</span>
                 <span className="value">
-                  {transaction.receiverLocation.city}, {transaction.receiverLocation.country}
+                  {transaction.receiverLocation.city || 'Unknown'}, {transaction.receiverLocation.country || 'Unknown'}
                 </span>
               </div>
             )}
@@ -256,27 +334,27 @@ export default function PrintReceipt({ transaction, onClose }) {
               <tbody>
                 <tr>
                   <td>Transaction Amount</td>
-                  <td className="amount-cell">SSP { (transaction.amount || 0).toFixed(2) }</td>
+                  <td className="amount-cell">SSP { (parseFloat(transaction.amount) || 0).toFixed(2) }</td>
                 </tr>
                 {transaction.agentCommission !== undefined && (
                   <tr>
                     <td>Agent Commission ({transaction.agentCommissionPercent}%)</td>
-                    <td className="amount-cell">SSP { (transaction.agentCommission || 0).toFixed(2) }</td>
+                    <td className="amount-cell">SSP { (parseFloat(transaction.agentCommission) || 0).toFixed(2) }</td>
                   </tr>
                 )}
                 {transaction.companyCommission !== undefined && (
                   <tr>
                     <td>Company Commission ({transaction.companyCommissionPercent}%)</td>
-                    <td className="amount-cell">SSP { (transaction.companyCommission || 0).toFixed(2) }</td>
+                    <td className="amount-cell">SSP { (parseFloat(transaction.companyCommission) || 0).toFixed(2) }</td>
                   </tr>
                 )}
                 <tr>
                   <td><strong>Total Commission Fee</strong></td>
-                  <td className="amount-cell">SSP { ((transaction.agentCommission || 0) + (transaction.companyCommission || 0)).toFixed(2) }</td>
+                  <td className="amount-cell">SSP { ((parseFloat(transaction.agentCommission) || 0) + (parseFloat(transaction.companyCommission) || 0)).toFixed(2) }</td>
                 </tr>
                 <tr>
                   <td><strong>Total User Pays</strong></td>
-                  <td className="amount-cell">SSP { ((transaction.amount || 0) + (transaction.agentCommission || 0) + (transaction.companyCommission || 0)).toFixed(2) }</td>
+                  <td className="amount-cell">SSP { ((parseFloat(transaction.amount) || 0) + (parseFloat(transaction.agentCommission) || 0) + (parseFloat(transaction.companyCommission) || 0)).toFixed(2) }</td>
                 </tr>
               </tbody>
             </table>
@@ -306,6 +384,7 @@ export default function PrintReceipt({ transaction, onClose }) {
 
         <div className="print-receipt-actions">
           <button className="btn btn-primary" onClick={handlePrint}>🖨️ Print Receipt</button>
+          <button className="btn btn-secondary" onClick={handleNativePrint}>🖨️ Quick Print</button>
           <button className="btn btn-primary" onClick={() => generateTransactionDocument(transaction)}>📥 Download PDF</button>
           <button className="btn btn-outline" onClick={onClose}>Close</button>
         </div>

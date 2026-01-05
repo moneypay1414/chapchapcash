@@ -43,6 +43,8 @@ export const adminAPI = {
   setCommission: (data) => api.post('/admin/commission', data),
   getTieredCommission: () => api.get('/admin/tiered-commission'),
   setTieredCommission: (data) => api.post('/admin/tiered-commission', data),
+  setSendMoneyTiers: (data) => api.post('/admin/tiered-commission/send-money', data),
+  setWithdrawalTiers: (data) => api.post('/admin/tiered-commission/withdrawal', data),
   getStateSettings: () => api.get('/admin/state-settings'),
   createStateSetting: (data) => api.post('/admin/state-settings', data),
   updateStateSetting: (id, data) => api.put(`/admin/state-settings/${id}`, data),
@@ -71,7 +73,8 @@ export const adminAPI = {
   unsuspendUser: (data) => api.post('/admin/unsuspend-user', data),
   getStats: () => api.get('/admin/stats'),
   grantLocationPermissionToAll: () => api.post('/admin/grant-location'),
-  createTransaction: (data) => api.post('/admin/money-exchange', data)
+  createTransaction: (data) => api.post('/admin/money-exchange', data),
+  convertMoneyExchange: (data) => api.post('/admin/convert-money-exchange', data)
 };
 
 export const notificationAPI = {

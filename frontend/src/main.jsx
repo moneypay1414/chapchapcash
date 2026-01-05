@@ -3,14 +3,16 @@ import ReactDOM from 'react-dom/client'
 import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom'
 import { useAuthStore } from './context/store'
 
-// Apply theme on app load
-const applyTheme = () => {
-  const theme = useAuthStore.getState().theme || 'light'
-  document.documentElement.setAttribute('data-theme', theme)
-  localStorage.setItem('theme', theme)
-}
+// Theme provider component
+function ThemeProvider({ children }) {
+  React.useEffect(() => {
+    const theme = useAuthStore.getState().theme || 'light'
+    document.documentElement.setAttribute('data-theme', theme)
+    localStorage.setItem('theme', theme)
+  }, [])
 
-applyTheme()
+  return children
+}
 
 // Suppress React Router v7 startTransition warning since we've already opted in via the future flag
 const originalWarn = console.warn
@@ -64,7 +66,6 @@ import AdminStateSettings from './pages/AdminStateSettings'
 import AdminStateSend from './pages/AdminStateSend'
 import AdminStatePending from './pages/AdminStatePending'
 import AdminCurrency from './pages/AdminCurrency'
-import AdminCurrencyConverter from './pages/AdminCurrencyConverter'
 import AdminCurrencyRates from './pages/AdminCurrencyRates'
 import AdminMoneyExchange from './pages/AdminMoneyExchange'
 import AgentDashboard from './pages/AgentDashboard'
@@ -144,7 +145,6 @@ const router = createBrowserRouter(
             { path: 'tiered-commission', element: <AdminTieredCommission /> },
             { path: 'currencies', element: <AdminCurrency /> },
             { path: 'currency-rates', element: <AdminCurrencyRates /> },
-            { path: 'currency-converter', element: <AdminCurrencyConverter /> },
             { path: 'money-exchange', element: <AdminMoneyExchange /> },
             { path: 'state-settings', element: <AdminStateSettings /> },
             { path: 'send-state', element: <AdminStateSend /> },
@@ -166,6 +166,8 @@ const router = createBrowserRouter(
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <RouterProvider router={router} />
+    <ThemeProvider>
+      <RouterProvider router={router} />
+    </ThemeProvider>
   </React.StrictMode>,
 )

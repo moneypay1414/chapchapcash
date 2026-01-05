@@ -31,7 +31,7 @@ export default function PendingAdminRequests() {
     setApprovingId(requestId);
     try {
       await withdrawalAPI.approveAdminWithdrawalRequest({ requestId });
-      setWithdrawalRequests(withdrawalRequests.filter(r => r._id !== requestId));
+      setWithdrawalRequests(withdrawalRequests.filter(r => r.id !== requestId));
       
       // Dispatch event to refresh agent dashboard stats
       window.dispatchEvent(new CustomEvent('mpay:withdrawal-approved'));
@@ -50,7 +50,7 @@ export default function PendingAdminRequests() {
       
         // Dispatch event to refresh agent dashboard stats
         window.dispatchEvent(new CustomEvent('mpay:withdrawal-rejected'));
-      setWithdrawalRequests(withdrawalRequests.filter(r => r._id !== requestId));
+      setWithdrawalRequests(withdrawalRequests.filter(r => r.id !== requestId));
     } catch (err) {
       console.error('Failed to reject withdrawal:', err);
       alert(err.response?.data?.message || 'Failed to reject withdrawal');
@@ -91,25 +91,25 @@ export default function PendingAdminRequests() {
                 </thead>
                 <tbody>
                   {withdrawalRequests.map((request) => (
-                    <tr key={request._id}>
+                    <tr key={request.id}>
                       <td>{request.user?.name || request.user?.phone || 'Unknown Admin'}</td>
-                      <td>SSP {request.amount.toFixed(2)}</td>
+                      <td>SSP {(parseFloat(request.amount) || 0).toFixed(2)}</td>
                       <td>{new Date(request.createdAt).toLocaleString()}</td>
                       <td>
                         <button
-                          onClick={() => handleApproveWithdrawal(request._id)}
-                          disabled={approvingId === request._id || rejectingId === request._id}
+                          onClick={() => handleApproveWithdrawal(request.id)}
+                          disabled={approvingId === request.id || rejectingId === request.id}
                           className="btn btn-sm btn-success"
                           style={{ marginRight: '0.5rem' }}
                         >
-                          {approvingId === request._id ? 'Approving...' : 'Approve'}
+                          {approvingId === request.id ? 'Approving...' : 'Approve'}
                         </button>
                         <button
-                          onClick={() => handleRejectWithdrawal(request._id)}
-                          disabled={approvingId === request._id || rejectingId === request._id}
+                          onClick={() => handleRejectWithdrawal(request.id)}
+                          disabled={approvingId === request.id || rejectingId === request.id}
                           className="btn btn-sm btn-danger"
                         >
-                          {rejectingId === request._id ? 'Rejecting...' : 'Reject'}
+                          {rejectingId === request.id ? 'Rejecting...' : 'Reject'}
                         </button>
                       </td>
                     </tr>

@@ -196,3 +196,225 @@
     font-size: 16px;
   }
 }
+
+/* Mobile Styles (480px - 768px) */
+@media (min-width: 480px) and (max-width: 768px) {
+  .auth-container {
+    padding: 15px;
+    animation: slideInUp 0.6s ease-out;
+  }
+
+  .auth-card {
+    max-width: 100%;
+    border-radius: 12px;
+    transform: scale(0.98);
+    transition: transform 0.3s ease;
+  }
+
+  .auth-card:hover {
+    transform: scale(1);
+  }
+
+  .auth-header {
+    padding: 30px 20px;
+  }
+
+  .auth-header h1 {
+    font-size: 28px;
+    margin-bottom: 6px;
+    animation: fadeInDown 0.8s ease-out 0.2s both;
+  }
+
+  .auth-header p {
+    font-size: 13px;
+    animation: fadeIn 0.8s ease-out 0.4s both;
+  }
+
+  .auth-form {
+    padding: 25px;
+  }
+
+  .auth-form h2 {
+    font-size: 20px;
+    animation: slideInLeft 0.6s ease-out 0.1s both;
+  }
+
+  .auth-subtitle {
+    font-size: 13px;
+    margin-bottom: 20px;
+    animation: slideInLeft 0.6s ease-out 0.2s both;
+  }
+
+  .password-toggle {
+    animation: bounceIn 0.5s ease-out 0.8s both;
+  }
+}
+
+/* Tablet Styles (834px - 1024px) */
+@media (min-width: 834px) and (max-width: 1024px) {
+  .auth-container {
+    padding: 20px;
+    animation: slideInUp 0.6s ease-out;
+  }
+
+  .auth-card {
+    max-width: 90%;
+    border-radius: 14px;
+    box-shadow: 0 25px 70px rgba(0, 0, 0, 0.25);
+    transition: all 0.3s ease;
+  }
+
+  .auth-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.3);
+  }
+
+  .auth-header {
+    padding: 35px 25px;
+  }
+
+  .auth-header h1 {
+    font-size: 32px;
+    margin-bottom: 8px;
+    animation: fadeInDown 0.8s ease-out 0.2s both;
+  }
+
+  .auth-header p {
+    font-size: 14px;
+    animation: fadeIn 0.8s ease-out 0.4s both;
+  }
+
+  .auth-form {
+    padding: 35px;
+  }
+
+  .auth-form h2 {
+    font-size: 22px;
+    animation: slideInLeft 0.6s ease-out 0.1s both;
+  }
+
+  .auth-subtitle {
+    font-size: 14px;
+    margin-bottom: 22px;
+    animation: slideInLeft 0.6s ease-out 0.2s both;
+  }
+
+  .password-toggle {
+    animation: bounceIn 0.5s ease-out 0.8s both;
+  }
+}
+
+/* Laptop Styles (1440px+) */
+@media (min-width: 1440px) {
+  .auth-container {
+    padding: 30px;
+    animation: slideInUp 0.6s ease-out;
+  }
+
+  .auth-card {
+    max-width: 450px;
+    border-radius: 16px;
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.3);
+    transition: all 0.4s ease;
+  }
+
+  .auth-card:hover {
+    transform: translateY(-8px) scale(1.02);
+    box-shadow: 0 40px 100px rgba(0, 0, 0, 0.35);
+  }
+
+  .auth-header {
+    padding: 45px 30px;
+  }
+
+  .auth-header h1 {
+    font-size: 38px;
+    margin-bottom: 10px;
+    animation: fadeInDown 0.8s ease-out 0.2s both;
+  }
+
+  .auth-header p {
+    font-size: 15px;
+    animation: fadeIn 0.8s ease-out 0.4s both;
+  }
+
+  .auth-form {
+    padding: 45px;
+  }
+
+  .auth-form h2 {
+    font-size: 24px;
+    animation: slideInLeft 0.6s ease-out 0.1s both;
+  }
+
+  .auth-subtitle {
+    font-size: 15px;
+    margin-bottom: 26px;
+    animation: slideInLeft 0.6s ease-out 0.2s both;
+  }
+
+  .password-toggle {
+    animation: bounceIn 0.5s ease-out 0.8s both;
+  }
+}
+
+/* Keyframe Animations */
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes bounceIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+  70% {
+    transform: scale(0.9);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}

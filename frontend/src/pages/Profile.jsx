@@ -270,7 +270,7 @@ export default function Profile() {
 
             <div className="detail-item">
               <span className="detail-label">Current Balance</span>
-              <span className="detail-value text-success font-weight-bold">SSP {user?.balance?.toFixed(2) || '0.00'}</span>
+              <span className="detail-value text-success font-weight-bold">SSP {(parseFloat(user?.balance) || 0).toFixed(2)}</span>
             </div>
 
             {user?.role === 'agent' && user?.agentId && (

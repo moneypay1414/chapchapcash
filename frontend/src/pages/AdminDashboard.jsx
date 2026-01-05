@@ -29,7 +29,7 @@ export default function AdminDashboard() {
     const map = new Map();
     (moneyExchangeTransactions || []).forEach(t => {
       const id = t.sender?._id || t.sender?.phone || '';
-      const name = ((t.sender?.firstName || '') + ' ' + (t.sender?.lastName || '')).trim() || t.sender?.phone || id;
+      const name = t.sender?.name || t.sender?.phone || id;
       if (id && !map.has(id)) map.set(id, { id, name });
     });
     return Array.from(map.values());
@@ -147,8 +147,8 @@ export default function AdminDashboard() {
     if (exchangeSortByAdminAsc === null) return filteredMoneyExchangeTransactions;
     const copy = [...filteredMoneyExchangeTransactions];
     copy.sort((a, b) => {
-      const nameA = (((a.sender?.firstName || '') + ' ' + (a.sender?.lastName || '')).trim()) || a.sender?.phone || '';
-      const nameB = (((b.sender?.firstName || '') + ' ' + (b.sender?.lastName || '')).trim()) || b.sender?.phone || '';
+      const nameA = a.sender?.name || a.sender?.phone || '';
+      const nameB = b.sender?.name || b.sender?.phone || '';
       if (!nameA && !nameB) return 0;
       if (!nameA) return exchangeSortByAdminAsc ? -1 : 1;
       if (!nameB) return exchangeSortByAdminAsc ? 1 : -1;
@@ -234,7 +234,7 @@ export default function AdminDashboard() {
           <div className="stat-icon">💰</div>
           <div className="stat-content">
             <p className="stat-label">Total Volume</p>
-            <h3 className="stat-value">SSP {(stats?.totalVolume || 0).toFixed(2)}</h3>
+            <h3 className="stat-value">SSP {(Number(stats?.totalVolume) || 0).toFixed(2)}</h3>
           </div>
         </div>
 
@@ -250,7 +250,7 @@ export default function AdminDashboard() {
           <div className="stat-icon">💵</div>
           <div className="stat-content">
             <p className="stat-label">All Admins Cashed Out</p>
-            <h3 className="stat-value">SSP {(stats?.totalAdminCashOut || 0).toFixed(2)}</h3>
+            <h3 className="stat-value">SSP {(Number(stats?.totalAdminCashOut) || 0).toFixed(2)}</h3>
           </div>
         </div>
 
@@ -258,14 +258,14 @@ export default function AdminDashboard() {
           <div className="stat-icon">👛</div>
           <div className="stat-content">
             <p className="stat-label">Admin Commission Cash</p>
-            <h3 className="stat-value">SSP {(myCashedOut !== null ? myCashedOut : 0).toFixed(2)}</h3>
+            <h3 className="stat-value">SSP {(myCashedOut !== null ? Number(myCashedOut) : 0).toFixed(2)}</h3>
           </div>
         </div>
         <div className="stat-card">
           <div className="stat-icon">🏦</div>
           <div className="stat-content">
             <p className="stat-label">Company Benefits</p>
-            <h3 className="stat-value">SSP {(stats?.companyBenefits || 0).toFixed(2)}</h3>
+            <h3 className="stat-value">SSP {(Number(stats?.companyBenefits) || 0).toFixed(2)}</h3>
           </div>
         </div>
       </div>
@@ -390,7 +390,7 @@ export default function AdminDashboard() {
                         </td>
                         <td>
                           <span style={{ fontSize: '13px' }}>
-                            {transaction.sender?.firstName} {transaction.sender?.lastName || transaction.sender?.phone || 'Admin'}
+                            {transaction.sender?.name || transaction.sender?.phone || 'Admin'}
                           </span>
                         </td>
                         <td style={{ fontSize: '12px', color: '#666' }}>

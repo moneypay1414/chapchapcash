@@ -19,18 +19,19 @@ Authorization: Bearer <your_jwt_token>
 ### Success Response
 ```json
 {
-  "success": true,
+  "message": "Operation successful",
   "data": {},
-  "message": "Operation successful"
+  "transaction": {},
+  "user": {},
+  "users": [],
+  "transactions": []
 }
 ```
 
 ### Error Response
 ```json
 {
-  "success": false,
-  "message": "Error description",
-  "error": "ERROR_CODE"
+  "message": "Error description"
 }
 ```
 
@@ -48,14 +49,17 @@ Content-Type: application/json
   "email": "john@example.com",
   "phone": "+211912345678",
   "password": "securepassword",
-  "role": "user"  // "user" or "agent"
+  "role": "user",  // "user", "agent", or "admin"
+  "agentId": "123456"  // optional, auto-generated for agents
 }
 
 Response:
 {
   "message": "User registered. Please verify your phone number.",
-  "userId": "user_id",
-  "phone": "+211912345678"
+  "userId": 1,
+  "phone": "+211912345678",
+  "agentId": null,
+  "adminId": null
 }
 ```
 
@@ -82,20 +86,28 @@ Content-Type: application/json
 
 {
   "email": "john@example.com",
-  "password": "securepassword"
+  "password": "securepassword",
+  "latitude": 4.85,  // optional
+  "longitude": 31.6  // optional
 }
 
 Response:
 {
   "token": "eyJhbGciOiJIUzI1NiIs...",
   "user": {
-    "_id": "user_id",
+    "id": 1,
     "name": "John Doe",
     "email": "john@example.com",
     "phone": "+211912345678",
     "role": "user",
     "balance": 5000,
-    "isVerified": true
+    "isVerified": true,
+    "agentId": null,
+    "adminId": null,
+    "autoAdminCashout": false,
+    "adminLocationConsent": false,
+    "theme": "light",
+    "currentLocation": null
   }
 }
 ```
@@ -107,7 +119,7 @@ Authorization: Bearer <token>
 
 Response:
 {
-  "_id": "user_id",
+  "id": 1,
   "name": "John Doe",
   "email": "john@example.com",
   "phone": "+211912345678",
@@ -115,6 +127,8 @@ Response:
   "role": "user",
   "isVerified": true,
   "isSuspended": false,
+  "agentId": null,
+  "adminId": null,
   "createdAt": "2024-01-15T10:30:00Z"
 }
 ```
@@ -133,10 +147,21 @@ Content-Type: application/json
 
 Response:
 {
-  "_id": "user_id",
+  "id": 1,
   "name": "John Doe",
   "email": "john@example.com",
   "profileImage": "url_to_image"
+}
+```
+
+### Check Balance
+```
+GET /auth/check-balance
+Authorization: Bearer <token>
+
+Response:
+{
+  "balance": 5000
 }
 ```
 
@@ -160,7 +185,7 @@ Response:
 {
   "message": "Money sent successfully",
   "transaction": {
-    "_id": "transaction_id",
+    "id": 1,
     "transactionId": "TXN202401001",
     "amount": 1000,
     "recipient": "+211987654321",
@@ -171,6 +196,7 @@ Response:
 Error Cases:
 - 400: "Insufficient balance"
 - 404: "Recipient not found"
+- 400: "You can't send money to this person" (sending to agent/admin as user)
 ```
 
 ### Withdraw Money
@@ -180,7 +206,7 @@ Authorization: Bearer <token>
 Content-Type: application/json
 
 {
-  "agentId": "agent_user_id",
+  "agentId": "123456",
   "amount": 5000
 }
 
@@ -188,7 +214,7 @@ Response:
 {
   "message": "Withdrawal initiated",
   "transaction": {
-    "_id": "transaction_id",
+    "id": 2,
     "transactionId": "TXN202401002",
     "amount": 5000
   }
@@ -204,27 +230,32 @@ Error Cases:
 GET /transactions/transactions
 Authorization: Bearer <token>
 
-Query Parameters:
-- limit: number (default: 50)
-- offset: number (default: 0)
-- status: "completed" | "pending" | "failed"
-
 Response:
-{
-  "transactions": [
-    {
-      "_id": "id",
-      "transactionId": "TXN202401001",
-      "sender": { "name": "John", "phone": "+211..." },
-      "receiver": { "name": "Jane", "phone": "+211..." },
-      "amount": 1000,
-      "type": "transfer",
-      "status": "completed",
-      "createdAt": "2024-01-15T10:30:00Z"
+[
+  {
+    "id": 1,
+    "transactionId": "TXN202401001",
+    "senderId": 1,
+    "receiverId": 2,
+    "amount": 1000,
+    "type": "transfer",
+    "status": "completed",
+    "description": "Payment for service",
+    "senderBalance": 4000,
+    "receiverBalance": 6000,
+    "companyCommission": 30,
+    "companyCommissionPercent": 3,
+    "createdAt": "2024-01-15T10:30:00Z",
+    "sender": {
+      "name": "John Doe",
+      "phone": "+211912345678"
+    },
+    "receiver": {
+      "name": "Jane Smith",
+      "phone": "+211987654321"
     }
-  ],
-  "total": 50
-}
+  }
+]
 ```
 
 ### Get Transaction Stats
@@ -236,7 +267,22 @@ Response:
 {
   "totalTransactions": 25,
   "totalSent": 15000,
-  "totalReceived": 8000
+  "totalReceived": 8000,
+  "pendingAgentCommission": 150,
+  "pendingCompanyCommission": 450
+}
+```
+
+### Get User Info
+```
+GET /transactions/user-info/:phoneNumber
+Authorization: Bearer <token>
+
+Response:
+{
+  "id": 2,
+  "name": "Jane Smith",
+  "phone": "+211987654321"
 }
 ```
 
@@ -246,14 +292,134 @@ Response:
 
 All admin endpoints require `Authorization: Bearer <token>` and admin role.
 
-### Topup User Account
+### Commission Management
+
+#### Get Commission
+```
+GET /admin/commission
+Authorization: Bearer <admin_token>
+
+Response:
+{
+  "commission": 5
+}
+```
+
+#### Set Commission
+```
+POST /admin/commission
+Authorization: Bearer <admin_token>
+Content-Type: application/json
+
+{
+  "commission": 5
+}
+
+Response:
+{
+  "message": "Commission updated successfully"
+}
+```
+
+### User Management
+
+#### Get All Users
+```
+GET /admin/users
+Authorization: Bearer <admin_token>
+
+Response:
+[
+  {
+    "id": 1,
+    "name": "John Doe",
+    "email": "john@example.com",
+    "phone": "+211912345678",
+    "role": "user",
+    "balance": 5000,
+    "isVerified": true,
+    "isSuspended": false,
+    "agentId": null,
+    "adminId": null,
+    "createdAt": "2024-01-15T10:30:00Z"
+  }
+]
+```
+
+#### Suspend User
+```
+POST /admin/suspend-user
+Authorization: Bearer <admin_token>
+Content-Type: application/json
+
+{
+  "userId": 1
+}
+
+Response:
+{
+  "message": "User suspended"
+}
+```
+
+#### Unsuspend User
+```
+POST /admin/unsuspend-user
+Authorization: Bearer <admin_token>
+Content-Type: application/json
+
+{
+  "userId": 1
+}
+
+Response:
+{
+  "message": "User unsuspended"
+}
+```
+
+### Transaction Management
+
+#### Get All Transactions
+```
+GET /admin/transactions
+Authorization: Bearer <admin_token>
+
+Response:
+[
+  {
+    "id": 1,
+    "transactionId": "TXN202401001",
+    "senderId": 1,
+    "receiverId": 2,
+    "amount": 1000,
+    "type": "transfer",
+    "status": "completed",
+    "createdAt": "2024-01-15T10:30:00Z",
+    "sender": {
+      "name": "John Doe",
+      "phone": "+211912345678",
+      "role": "user"
+    },
+    "receiver": {
+      "name": "Jane Smith",
+      "phone": "+211987654321",
+      "role": "user"
+    }
+  }
+]
+```
+
+### Balance Management
+
+#### Topup User Account
 ```
 POST /admin/topup-user
 Authorization: Bearer <admin_token>
 Content-Type: application/json
 
 {
-  "userId": "user_id",
+  "userId": 1,
   "amount": 10000,
   "description": "Admin topup"
 }
@@ -262,21 +428,21 @@ Response:
 {
   "message": "Topup successful",
   "transaction": {
-    "_id": "id",
+    "id": 3,
     "transactionId": "TXN202401003",
     "amount": 10000
   }
 }
 ```
 
-### Withdraw from User
+#### Withdraw from User
 ```
 POST /admin/withdraw-from-user
 Authorization: Bearer <admin_token>
 Content-Type: application/json
 
 {
-  "userId": "user_id",
+  "userId": 1,
   "amount": 5000,
   "description": "Admin withdrawal"
 }
@@ -285,115 +451,164 @@ Response:
 {
   "message": "Withdrawal successful",
   "transaction": {
-    "_id": "id",
+    "id": 4,
     "transactionId": "TXN202401004",
     "amount": 5000
   }
 }
 ```
 
-### Get All Users
+#### Push Money Between Users
 ```
-GET /admin/users
-Authorization: Bearer <admin_token>
-
-Query Parameters:
-- role: "user" | "agent" | "admin"
-- suspended: true | false
-- limit: number
-- offset: number
-
-Response:
-{
-  "users": [
-    {
-      "_id": "id",
-      "name": "John Doe",
-      "email": "john@example.com",
-      "phone": "+211912345678",
-      "role": "user",
-      "balance": 5000,
-      "isVerified": true,
-      "isSuspended": false,
-      "createdAt": "2024-01-15T10:30:00Z"
-    }
-  ],
-  "total": 100
-}
-```
-
-### Get All Transactions
-```
-GET /admin/transactions
-Authorization: Bearer <admin_token>
-
-Query Parameters:
-- status: "completed" | "pending" | "failed"
-- type: "transfer" | "topup" | "withdrawal"
-- startDate: "2024-01-01"
-- endDate: "2024-01-31"
-- limit: number
-- offset: number
-
-Response:
-{
-  "transactions": [
-    {
-      "_id": "id",
-      "transactionId": "TXN202401001",
-      "sender": { "phone": "+211...", "role": "user" },
-      "receiver": { "phone": "+211...", "role": "user" },
-      "amount": 1000,
-      "type": "transfer",
-      "status": "completed",
-      "createdAt": "2024-01-15T10:30:00Z"
-    }
-  ],
-  "total": 500
-}
-```
-
-### Suspend User
-```
-POST /admin/suspend-user
+POST /admin/push-money
 Authorization: Bearer <admin_token>
 Content-Type: application/json
 
 {
-  "userId": "user_id"
+  "fromUserId": 1,
+  "toUserId": 2,
+  "amount": 1000,
+  "description": "Admin transfer"
 }
 
 Response:
 {
-  "message": "User suspended",
-  "user": {
-    "_id": "id",
-    "isSuspended": true
-  }
+  "message": "Money pushed successfully"
 }
 ```
 
-### Unsuspend User
+### Agent Management
+
+#### Find Agent by Agent ID
 ```
-POST /admin/unsuspend-user
+GET /admin/find-agent?agentId=123456
+Authorization: Bearer <admin_token>
+
+Response:
+{
+  "id": 2,
+  "name": "Agent Name",
+  "phone": "+211987654321",
+  "agentId": "123456"
+}
+```
+
+#### Withdraw from Agent
+```
+POST /admin/withdraw-from-agent
 Authorization: Bearer <admin_token>
 Content-Type: application/json
 
 {
-  "userId": "user_id"
+  "agentId": "123456",
+  "amount": 5000
 }
 
 Response:
 {
-  "message": "User unsuspended",
-  "user": {
-    "_id": "id",
-    "isSuspended": false
-  }
+  "message": "Withdrawal from agent successful"
 }
 ```
 
-### Get Admin Stats
+#### Request Agent Withdrawal
+```
+POST /admin/request-agent-withdrawal
+Authorization: Bearer <admin_token>
+Content-Type: application/json
+
+{
+  "agentId": "123456",
+  "amount": 5000
+}
+
+Response:
+{
+  "message": "Agent withdrawal request created"
+}
+```
+
+### Commission Management
+
+#### Get Tiered Commission
+```
+GET /admin/tiered-commission
+Authorization: Bearer <admin_token>
+
+Response:
+{
+  "sendMoneyTiers": [
+    {
+      "id": 1,
+      "minAmount": 0,
+      "maxAmount": 99,
+      "companyPercent": 0
+    }
+  ],
+  "withdrawalTiers": [
+    {
+      "id": 1,
+      "minAmount": 0,
+      "maxAmount": 499,
+      "agentPercent": 5,
+      "companyPercent": 2
+    }
+  ]
+}
+```
+
+#### Set Send Money Tiers
+```
+POST /admin/tiered-commission/send-money
+Authorization: Bearer <admin_token>
+Content-Type: application/json
+
+{
+  "tiers": [
+    {
+      "minAmount": 0,
+      "maxAmount": 99,
+      "companyPercent": 0
+    },
+    {
+      "minAmount": 100,
+      "maxAmount": 499,
+      "companyPercent": 1
+    }
+  ]
+}
+
+Response:
+{
+  "message": "Send money commission tiers updated"
+}
+```
+
+#### Set Withdrawal Tiers
+```
+POST /admin/tiered-commission/withdrawal
+Authorization: Bearer <admin_token>
+Content-Type: application/json
+
+{
+  "tiers": [
+    {
+      "minAmount": 0,
+      "maxAmount": 499,
+      "agentPercent": 5,
+      "companyPercent": 2
+    }
+  ]
+}
+
+Response:
+{
+  "message": "Withdrawal commission tiers updated"
+}
+```
+
+### Admin Stats
+
+#### Get Admin Stats
 ```
 GET /admin/stats
 Authorization: Bearer <admin_token>
@@ -406,11 +621,439 @@ Response:
   "completedTransactions": 1450,
   "pendingTransactions": 50,
   "usersByRole": [
-    { "_id": "user", "count": 200 },
-    { "_id": "agent", "count": 40 },
-    { "_id": "admin", "count": 10 }
-  ]
+    { "role": "user", "count": 200 },
+    { "role": "agent", "count": 40 },
+    { "role": "admin", "count": 10 }
+  ],
+  "totalAdminCashOut": 100000,
+  "companyBenefits": 15000
 }
+```
+
+#### Get My Admin Cash Out
+```
+GET /admin/stats/my-cashed-out
+Authorization: Bearer <admin_token>
+
+Response:
+{
+  "totalCashedOut": 50000
+}
+```
+
+#### Get My Admin Commission
+```
+GET /admin/stats/my-commission
+Authorization: Bearer <admin_token>
+
+Response:
+{
+  "totalCommission": 2500
+}
+```
+
+### Location Management
+
+#### Grant Location Permission to All Users
+```
+POST /admin/grant-location
+Authorization: Bearer <admin_token>
+
+Response:
+{
+  "message": "Location permission granted to all users"
+}
+```
+
+### State Settings (Admin-to-Admin Transfers)
+
+#### Get State Settings
+```
+GET /admin/state-settings
+Authorization: Bearer <admin_token>
+
+Response:
+[
+  {
+    "id": 1,
+    "state": "Central Equatoria",
+    "adminId": "123456",
+    "createdAt": "2024-01-15T10:30:00Z"
+  }
+]
+```
+
+#### Create State Setting
+```
+POST /admin/state-settings
+Authorization: Bearer <admin_token>
+Content-Type: application/json
+
+{
+  "state": "Central Equatoria",
+  "adminId": "123456"
+}
+
+Response:
+{
+  "message": "State setting created"
+}
+```
+
+#### Update State Setting
+```
+PUT /admin/state-settings/:id
+Authorization: Bearer <admin_token>
+Content-Type: application/json
+
+{
+  "state": "Central Equatoria",
+  "adminId": "123456"
+}
+
+Response:
+{
+  "message": "State setting updated"
+}
+```
+
+#### Delete State Setting
+```
+DELETE /admin/state-settings/:id
+Authorization: Bearer <admin_token>
+
+Response:
+{
+  "message": "State setting deleted"
+}
+```
+
+#### Send Money Between Admins by State
+```
+POST /admin/send-state
+Authorization: Bearer <admin_token>
+Content-Type: application/json
+
+{
+  "toState": "Central Equatoria",
+  "amount": 10000,
+  "description": "State transfer"
+}
+
+Response:
+{
+  "message": "Money sent to state admin"
+}
+```
+
+#### Get Pending Send by State
+```
+GET /admin/send-state/pending
+Authorization: Bearer <admin_token>
+
+Response:
+[
+  {
+    "id": 1,
+    "fromAdminId": "123456",
+    "toState": "Central Equatoria",
+    "amount": 10000,
+    "status": "pending",
+    "createdAt": "2024-01-15T10:30:00Z"
+  }
+]
+```
+
+#### Get Pending Send by State Count
+```
+GET /admin/send-state/pending/count
+Authorization: Bearer <admin_token>
+
+Response:
+{
+  "count": 5
+}
+```
+
+#### Receive Send by State
+```
+POST /admin/send-state/:id/receive
+Authorization: Bearer <admin_token>
+
+Response:
+{
+  "message": "State transfer received"
+}
+```
+
+#### Cancel Send by State
+```
+POST /admin/send-state/:id/cancel
+Authorization: Bearer <admin_token>
+
+Response:
+{
+  "message": "State transfer cancelled"
+}
+```
+
+#### Edit Send by State
+```
+POST /admin/send-state/:id/edit
+Authorization: Bearer <admin_token>
+Content-Type: application/json
+
+{
+  "amount": 15000,
+  "description": "Updated transfer"
+}
+
+Response:
+{
+  "message": "State transfer updated"
+}
+```
+
+### Currency Management
+
+#### Get Currencies
+```
+GET /admin/currencies
+Authorization: Bearer <admin_token>
+
+Response:
+[
+  {
+    "id": 1,
+    "code": "SSP",
+    "name": "South Sudanese Pound",
+    "symbol": "SSP",
+    "createdAt": "2024-01-15T10:30:00Z"
+  }
+]
+```
+
+#### Create Currency
+```
+POST /admin/currencies
+Authorization: Bearer <admin_token>
+Content-Type: application/json
+
+{
+  "code": "USD",
+  "name": "US Dollar",
+  "symbol": "$"
+}
+
+Response:
+{
+  "message": "Currency created"
+}
+```
+
+#### Update Currency
+```
+PUT /admin/currencies/:id
+Authorization: Bearer <admin_token>
+Content-Type: application/json
+
+{
+  "code": "USD",
+  "name": "US Dollar",
+  "symbol": "$"
+}
+
+Response:
+{
+  "message": "Currency updated"
+}
+```
+
+#### Delete Currency
+```
+DELETE /admin/currencies/:id
+Authorization: Bearer <admin_token>
+
+Response:
+{
+  "message": "Currency deleted"
+}
+```
+
+### Exchange Rate Management
+
+#### Get Exchange Rates
+```
+GET /admin/exchange-rates
+Authorization: Bearer <admin_token>
+
+Response:
+[
+  {
+    "id": 1,
+    "fromCurrencyId": 1,
+    "toCurrencyId": 2,
+    "buyingPrice": 5800,
+    "sellingPrice": 5700,
+    "createdAt": "2024-01-15T10:30:00Z",
+    "fromCurrency": {
+      "code": "USD",
+      "name": "US Dollar"
+    },
+    "toCurrency": {
+      "code": "SSP",
+      "name": "South Sudanese Pound"
+    }
+  }
+]
+```
+
+#### Create Exchange Rate
+```
+POST /admin/exchange-rates
+Authorization: Bearer <admin_token>
+Content-Type: application/json
+
+{
+  "fromCurrencyId": 1,
+  "toCurrencyId": 2,
+  "buyingPrice": 5800,
+  "sellingPrice": 5700
+}
+
+Response:
+{
+  "message": "Exchange rate created"
+}
+```
+
+#### Update Exchange Rate
+```
+PUT /admin/exchange-rates/:id
+Authorization: Bearer <admin_token>
+Content-Type: application/json
+
+{
+  "fromCurrencyId": 1,
+  "toCurrencyId": 2,
+  "buyingPrice": 5900,
+  "sellingPrice": 5800
+}
+
+Response:
+{
+  "message": "Exchange rate updated"
+}
+```
+
+#### Delete Exchange Rate
+```
+DELETE /admin/exchange-rates/:id
+Authorization: Bearer <admin_token>
+
+Response:
+{
+  "message": "Exchange rate deleted"
+}
+```
+
+### Money Exchange
+
+#### Create Money Exchange Transaction
+```
+POST /admin/money-exchange
+Authorization: Bearer <admin_token>
+Content-Type: application/json
+
+{
+  "fromCurrencyId": 1,
+  "toCurrencyId": 2,
+  "amount": 100,
+  "exchangeRateId": 1
+}
+
+Response:
+{
+  "message": "Money exchange transaction created",
+  "transaction": {
+    "id": 1,
+    "amount": 100,
+    "convertedAmount": 580000,
+    "exchangeRate": 5800
+  }
+}
+```
+
+#### Convert Money Exchange
+```
+POST /admin/convert-money-exchange
+Authorization: Bearer <admin_token>
+Content-Type: application/json
+
+{
+  "fromCurrencyId": 1,
+  "toCurrencyId": 2,
+  "amount": 100
+}
+
+Response:
+{
+  "convertedAmount": 580000,
+  "exchangeRate": 5800
+}
+```
+
+### Agent Withdrawal Management
+
+#### Approve Withdrawal Request
+```
+POST /admin/approve-withdrawal-request
+Authorization: Bearer <admin_token>
+Content-Type: application/json
+
+{
+  "requestId": 1
+}
+
+Response:
+{
+  "message": "Withdrawal request approved"
+}
+```
+
+#### Reject Withdrawal Request
+```
+POST /admin/reject-withdrawal-request
+Authorization: Bearer <admin_token>
+Content-Type: application/json
+
+{
+  "requestId": 1
+}
+
+Response:
+{
+  "message": "Withdrawal request rejected"
+}
+```
+
+#### Get Agent Withdrawal Requests
+```
+GET /admin/agent-withdrawal-requests
+Authorization: Bearer <admin_token>
+
+Response:
+[
+  {
+    "id": 1,
+    "agentId": "123456",
+    "amount": 5000,
+    "status": "pending",
+    "agentCommission": 250,
+    "companyCommission": 100,
+    "createdAt": "2024-01-15T10:30:00Z"
+  }
+]
 ```
 
 ---
@@ -422,23 +1065,17 @@ Response:
 GET /notifications
 Authorization: Bearer <token>
 
-Query Parameters:
-- limit: number (default: 50)
-- skip: number (default: 0)
-
 Response:
-{
-  "notifications": [
-    {
-      "_id": "id",
-      "title": "Money Received",
-      "message": "You received SSP 1000 from John",
-      "type": "transaction",
-      "isRead": false,
-      "createdAt": "2024-01-15T10:30:00Z"
-    }
-  ]
-}
+[
+  {
+    "id": 1,
+    "title": "Money Received",
+    "message": "You received SSP 1000 from +211912345678",
+    "type": "transaction",
+    "isRead": false,
+    "createdAt": "2024-01-15T10:30:00Z"
+  }
+]
 ```
 
 ### Mark as Read
@@ -448,12 +1085,12 @@ Authorization: Bearer <token>
 Content-Type: application/json
 
 {
-  "notificationId": "notification_id"
+  "notificationId": 1
 }
 
 Response:
 {
-  "_id": "id",
+  "id": 1,
   "isRead": true
 }
 ```
@@ -469,6 +1106,17 @@ Response:
 }
 ```
 
+### Delete Notification
+```
+DELETE /notifications/:notificationId
+Authorization: Bearer <token>
+
+Response:
+{
+  "message": "Notification deleted"
+}
+```
+
 ### Send to All Users (Admin Only)
 ```
 POST /notifications/send-to-all
@@ -478,12 +1126,12 @@ Content-Type: application/json
 {
   "title": "System Maintenance",
   "message": "System will be down for maintenance tonight",
-  "type": "system"  // "system" | "alert" | "offer"
+  "type": "system"
 }
 
 Response:
 {
-  "message": "Notification sent to 250 users"
+  "message": "Notification sent to all users"
 }
 ```
 
@@ -494,7 +1142,7 @@ Authorization: Bearer <admin_token>
 Content-Type: application/json
 
 {
-  "userId": "user_id",
+  "userId": 1,
   "title": "Account Warning",
   "message": "Unusual activity detected on your account",
   "type": "alert"
@@ -502,19 +1150,95 @@ Content-Type: application/json
 
 Response:
 {
-  "message": "Notification sent",
-  "notification": { ... }
+  "message": "Notification sent"
 }
 ```
 
-### Delete Notification
+---
+
+## 💰 Withdrawal Endpoints
+
+### Request Withdrawal
 ```
-DELETE /notifications/:notificationId
+POST /withdrawals/request
 Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "agentId": "123456",
+  "amount": 5000
+}
 
 Response:
 {
-  "message": "Notification deleted"
+  "message": "Withdrawal request submitted"
+}
+```
+
+### Approve Withdrawal
+```
+POST /withdrawals/approve
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "requestId": 1
+}
+
+Response:
+{
+  "message": "Withdrawal approved"
+}
+```
+
+### Reject Withdrawal
+```
+POST /withdrawals/reject
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "requestId": 1
+}
+
+Response:
+{
+  "message": "Withdrawal rejected"
+}
+```
+
+### Get Pending Withdrawals
+```
+GET /withdrawals/pending
+Authorization: Bearer <token>
+
+Response:
+[
+  {
+    "id": 1,
+    "userId": 1,
+    "agentId": "123456",
+    "amount": 5000,
+    "status": "pending",
+    "agentCommission": 250,
+    "companyCommission": 100,
+    "createdAt": "2024-01-15T10:30:00Z"
+  }
+]
+```
+
+---
+
+## 🏥 Health Check
+
+### Health Check
+```
+GET /health
+
+Response:
+{
+  "status": "OK",
+  "timestamp": "2024-01-15T10:30:00Z"
 }
 ```
 
@@ -538,13 +1262,12 @@ Response:
 
 | Error | Meaning |
 |-------|---------|
-| INVALID_CREDENTIALS | Email or password incorrect |
-| USER_EXISTS | Email or phone already registered |
-| INSUFFICIENT_BALANCE | Not enough funds |
-| INVALID_TOKEN | Token invalid or expired |
-| ACCESS_DENIED | Admin only endpoint |
-| RECIPIENT_NOT_FOUND | Phone number not found |
-| INVALID_AMOUNT | Amount is invalid |
+| User already exists | Email or phone already registered |
+| Invalid credentials | Email or password incorrect |
+| Insufficient balance | Not enough funds |
+| Recipient not found | Phone number not found |
+| Agent ID already exists | Agent ID taken |
+| You can't send money to this person | User trying to send to agent/admin |
 
 ---
 
@@ -583,6 +1306,12 @@ curl -X POST http://localhost:5000/api/transactions/send-money \
     "amount": 1000,
     "description": "Payment"
   }'
+```
+
+### Get Admin Stats
+```bash
+curl -X GET http://localhost:5000/api/admin/stats \
+  -H "Authorization: Bearer <admin_token>"
 ```
 
 ---
@@ -631,4 +1360,4 @@ For API issues or questions:
 
 ---
 
-**API Documentation v1.0** - Last Updated: January 2024 ✅
+**API Documentation v2.0** - Last Updated: January 2025 ✅

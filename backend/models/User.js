@@ -1,100 +1,108 @@
-import mongoose from 'mongoose';
+import { DataTypes } from 'sequelize';
+import sequelize from '../config/database.js';
 
-const userSchema = new mongoose.Schema({
+const User = sequelize.define('User', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
+  },
   name: {
-    type: String,
-    required: true
+    type: DataTypes.STRING,
+    allowNull: false
   },
   email: {
-    type: String,
-    required: true,
+    type: DataTypes.STRING,
+    allowNull: false,
     unique: true
   },
   phone: {
-    type: String,
-    required: true,
+    type: DataTypes.STRING,
+    allowNull: false,
     unique: true
   },
   password: {
-    type: String,
-    required: true
+    type: DataTypes.STRING,
+    allowNull: false
   },
   balance: {
-    type: Number,
-    default: 0
+    type: DataTypes.DECIMAL(10, 2),
+    defaultValue: 0
   },
-  // If true, admins can cash out from this agent without asking for agent approval
   autoAdminCashout: {
-    type: Boolean,
-    default: false
+    type: DataTypes.BOOLEAN,
+    defaultValue: false
   },
   role: {
-    type: String,
-    enum: ['user', 'agent', 'admin'],
-    default: 'user'
+    type: DataTypes.ENUM('user', 'agent', 'admin'),
+    defaultValue: 'user'
   },
   isVerified: {
-    type: Boolean,
-    default: false
+    type: DataTypes.BOOLEAN,
+    defaultValue: false
   },
   isSuspended: {
-    type: Boolean,
-    default: false
+    type: DataTypes.BOOLEAN,
+    defaultValue: false
   },
-  verificationCode: String,
-  verificationExpiry: Date,
-  profileImage: String,
-  idNumber: String,
+  verificationCode: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  verificationExpiry: {
+    type: DataTypes.DATE,
+    allowNull: true
+  },
+  profileImage: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  idNumber: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
   agentId: {
-    type: String,
-    unique: true,
-    sparse: true,
-    default: undefined
+    type: DataTypes.STRING,
+    allowNull: true,
+    unique: true
   },
   adminId: {
-    type: String,
-    unique: true,
-    sparse: true,
-    default: undefined
+    type: DataTypes.STRING,
+    allowNull: true,
+    unique: true
   },
-  // Optional reference to a StateSetting (admin's assigned state)
   state: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'StateSetting',
-    default: undefined
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: {
+      model: 'StateSettings',
+      key: 'id'
+    }
   },
   currentLocation: {
-    latitude: Number,
-    longitude: Number,
-    city: String,
-    country: String,
-    timestamp: Date
+    type: DataTypes.JSON,
+    allowNull: true
   },
-  // When true, admin has indicated users should use server-provided or IP-based location
   adminLocationConsent: {
-    type: Boolean,
-    default: false
+    type: DataTypes.BOOLEAN,
+    defaultValue: false
   },
   theme: {
-    type: String,
-    enum: ['light', 'dark'],
-    default: 'light'
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now
+    type: DataTypes.ENUM('light', 'dark'),
+    defaultValue: 'light'
   }
+}, {
+  timestamps: true
 });
 
-// Normalize empty strings to undefined before saving so sparse unique indexes ignore missing values
-userSchema.pre('save', function (next) {
-  if (this.agentId === '') this.agentId = undefined;
-  if (this.adminId === '') this.adminId = undefined;
-  next();
-});
+// Define associations
+User.associate = (models) => {
+  User.hasMany(models.Transaction, { foreignKey: 'senderId', as: 'sentTransactions' });
+  User.hasMany(models.Transaction, { foreignKey: 'receiverId', as: 'receivedTransactions' });
+  User.hasMany(models.Notification, { foreignKey: 'recipientId', as: 'notifications' });
+  User.hasMany(models.WithdrawalRequest, { foreignKey: 'agentId', as: 'agentRequests' });
+  User.hasMany(models.WithdrawalRequest, { foreignKey: 'userId', as: 'userRequests' });
+  User.belongsTo(models.StateSetting, { foreignKey: 'state', as: 'stateSetting' });
+};
 
-export default mongoose.model('User', userSchema);
+export default User;

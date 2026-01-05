@@ -4,6 +4,7 @@ import Footer from '../components/Footer';
 import PrintReceipt from '../components/PrintReceipt';
 import { transactionAPI } from '../utils/api';
 import { generateTransactionDocument } from '../utils/pdf';
+import { useAuthStore } from '../context/store';
 import '../styles/transactions.css';
 
 export default function Transactions() {
@@ -14,6 +15,7 @@ export default function Transactions() {
   const [filter, setFilter] = useState('all');
   const [searchId, setSearchId] = useState('');
   const [selectedTransaction, setSelectedTransaction] = useState(null);
+  const user = useAuthStore((state) => state.user);
 
   useEffect(() => {
     const fetchTransactions = async () => {
@@ -36,7 +38,7 @@ export default function Transactions() {
     .filter(t => {
       // If viewing specific transaction by ID, show only that one
       if (transactionIdParam) {
-        return t._id === transactionIdParam;
+        return t.id === transactionIdParam;
       }
       return !searchId || t.transactionId.toLowerCase().includes(searchId.toLowerCase());
     });
@@ -49,6 +51,25 @@ export default function Transactions() {
       agent_deposit: '🏪'
     };
     return icons[type] || '💳';
+  };
+
+  const getTransactionTitle = (tx) => {
+    const isOutgoing = tx.senderId === user?.id;
+    const counterparty = isOutgoing ? tx.receiver : tx.sender;
+    const counterpartyName = counterparty?.name || counterparty?.phone || 'Unknown';
+
+    switch (tx.type) {
+      case 'transfer':
+        return isOutgoing ? `Sent to ${counterpartyName}` : `Received from ${counterpartyName}`;
+      case 'withdrawal':
+        return 'Withdrawal Request';
+      case 'topup':
+        return 'Account Topup';
+      case 'agent_deposit':
+        return isOutgoing ? `Deposit to ${counterpartyName}` : `Deposit from ${counterpartyName}`;
+      default:
+        return tx.type;
+    }
   };
 
   const handleDownload = (tx) => {
@@ -103,24 +124,21 @@ export default function Transactions() {
           ) : (
             <div className="transactions-list">
               {filteredTransactions.map(tx => (
-                <div key={tx._id} className="transaction-item">
+                <div key={tx.id} className="transaction-item">
                   <div className="transaction-icon">
                     {getTypeIcon(tx.type)}
                   </div>
                   <div className="transaction-details">
                     <div>
                       <h4 className="transaction-title">
-                        {tx.type === 'transfer' && `Sent to ${tx.receiver?.phone}`}
-                        {tx.type === 'withdrawal' && 'Withdrawal Request'}
-                        {tx.type === 'topup' && 'Account Topup'}
-                        {tx.type === 'agent_deposit' && `Deposit from ${tx.sender?.phone}`}
+                        {getTransactionTitle(tx)}
                       </h4>
                       <p className="transaction-id">TX: {tx.transactionId}</p>
-                      {(tx.senderLocation || tx.receiverLocation) && (
+                      {(tx.sender || tx.receiver) && (
                         <p className="transaction-location" style={{ fontSize: '0.85rem', color: '#666', marginTop: '4px' }}>
-                          📍 {tx.senderLocation ? `From: ${tx.senderLocation.city}, ${tx.senderLocation.country}` : ''}
-                          {tx.senderLocation && tx.receiverLocation && ' | '}
-                          {tx.receiverLocation ? `To: ${tx.receiverLocation.city}, ${tx.receiverLocation.country}` : ''}
+                          📍 {tx.sender ? `From: ${tx.sender.name || tx.sender.phone}` : ''}
+                          {tx.sender && tx.receiver && ' | '}
+                          {tx.receiver ? `To: ${tx.receiver.name || tx.receiver.phone}` : ''}
                         </p>
                       )}
                     </div>
@@ -129,7 +147,7 @@ export default function Transactions() {
                     </div>
                   </div>
                   <div className="transaction-amount">
-                    SSP {tx.amount.toFixed(2)}
+                    SSP {(parseFloat(tx.amount) || 0).toFixed(2)}
                   </div>
                   <div className="transaction-status">
                     <span className={`badge badge-${

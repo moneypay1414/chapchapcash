@@ -1,56 +1,28 @@
-import mongoose from 'mongoose';
+import { DataTypes } from 'sequelize';
+import sequelize from '../config/database.js';
 
-const tieredCommissionSchema = new mongoose.Schema({
-  // Tiers for send-money transactions
-  // Each tier has a minimum amount threshold and separate agent/company commission percentages
-  tiers: [
-    {
-      minAmount: {
-        type: Number,
-        required: true,
-        default: 0
-      },
-      agentPercent: {
-        type: Number,
-        required: true,
-        default: 0
-      },
-      companyPercent: {
-        type: Number,
-        required: true,
-        default: 0
-      }
-    }
-  ],
-  // Tiers for withdrawal transactions
-  withdrawalTiers: [
-    {
-      minAmount: {
-        type: Number,
-        required: true,
-        default: 0
-      },
-      agentPercent: {
-        type: Number,
-        required: true,
-        default: 0
-      },
-      companyPercent: {
-        type: Number,
-        required: true,
-        default: 0
-      }
-    }
-  ],
-  type: {
-    type: String,
-    enum: ['send-money', 'withdraw'],
-    default: 'send-money'
+const TieredCommission = sequelize.define('TieredCommission', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
   },
-  updatedAt: {
-    type: Date,
-    default: Date.now
+  tiers: {
+    type: DataTypes.JSON,
+    allowNull: true,
+    defaultValue: []
+  },
+  withdrawalTiers: {
+    type: DataTypes.JSON,
+    allowNull: true,
+    defaultValue: []
+  },
+  type: {
+    type: DataTypes.ENUM('send-money', 'withdraw'),
+    defaultValue: 'send-money'
   }
+}, {
+  timestamps: true
 });
 
-export default mongoose.model('TieredCommission', tieredCommissionSchema);
+export default TieredCommission;

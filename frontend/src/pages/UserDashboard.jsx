@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuthStore } from '../context/store';
 import PrintReceipt from '../components/PrintReceipt';
-import { transactionAPI } from '../utils/api';
+import { transactionAPI, authAPI } from '../utils/api';
 import { Line, Bar, Doughnut } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, ArcElement, Filler } from 'chart.js';
 import Footer from '../components/Footer';
@@ -11,24 +11,30 @@ ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarEleme
 
 export default function UserDashboard() {
   const user = useAuthStore((state) => state.user);
+  const updateUser = useAuthStore((state) => state.updateUser);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedTransaction, setSelectedTransaction] = useState(null);
 
   useEffect(() => {
-    const fetchStats = async () => {
+    const fetchData = async () => {
       try {
-        const { data } = await transactionAPI.getStats();
-        setStats(data);
+        // Fetch updated user profile to ensure balance is current
+        const { data: userData } = await authAPI.getProfile();
+        updateUser(userData);
+
+        // Fetch transaction stats
+        const { data: statsData } = await transactionAPI.getStats();
+        setStats(statsData);
       } catch (error) {
-        console.error('Failed to fetch stats:', error);
+        console.error('Failed to fetch dashboard data:', error);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchStats();
-  }, []);
+    fetchData();
+  }, [updateUser]);
 
   const chartData = {
     labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4'],
@@ -84,7 +90,7 @@ export default function UserDashboard() {
           <div className="stat-icon balance">💰</div>
           <div className="stat-content">
             <p className="stat-label">My Wallet</p>
-            <h3 className="stat-value">SSP {user?.balance?.toFixed(2) || '0.00'}</h3>
+            <h3 className="stat-value">SSP {(parseFloat(user?.balance) || 0).toFixed(2)}</h3>
           </div>
         </div>
 
@@ -92,7 +98,7 @@ export default function UserDashboard() {
           <div className="stat-icon sent">📤</div>
           <div className="stat-content">
             <p className="stat-label">Money Sent</p>
-            <h3 className="stat-value">SSP {stats?.totalSent?.toFixed(2) || '0.00'}</h3>
+            <h3 className="stat-value">SSP {(parseFloat(stats?.totalSent) || 0).toFixed(2)}</h3>
           </div>
         </div>
 
@@ -100,7 +106,7 @@ export default function UserDashboard() {
           <div className="stat-icon received">📥</div>
           <div className="stat-content">
             <p className="stat-label">Total Received</p>
-            <h3 className="stat-value">SSP {stats?.totalReceived?.toFixed(2) || '0.00'}</h3>
+            <h3 className="stat-value">SSP {(parseFloat(stats?.totalReceived) || 0).toFixed(2)}</h3>
           </div>
         </div>
 

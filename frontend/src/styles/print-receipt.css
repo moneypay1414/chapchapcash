@@ -252,26 +252,99 @@
 
   .print-receipt-header,
   .print-receipt-actions {
-    display: none;
+    display: none !important;
   }
 
   .receipt-content {
     padding: 20px;
     margin: 0;
+    display: block !important;
+    visibility: visible !important;
+  }
+
+  .receipt-table {
+    display: table !important;
+    visibility: visible !important;
+    width: 100% !important;
+    border-collapse: collapse !important;
+    margin: 12px 0 !important;
+    border: 2px solid #000 !important;
+  }
+
+  .receipt-table th {
+    display: table-cell !important;
+    background: #000 !important;
+    color: #fff !important;
+    padding: 8px 10px !important;
+    text-align: left !important;
+    font-weight: bold !important;
+    font-size: 12px !important;
+    border: 1px solid #000 !important;
+    line-height: 1.4 !important;
+  }
+
+  .receipt-table td {
+    display: table-cell !important;
+    padding: 8px 10px !important;
+    border: 1px solid #000 !important;
+    font-size: 12px !important;
+    color: #000 !important;
+    font-weight: 500 !important;
+    line-height: 1.4 !important;
+    word-wrap: break-word !important;
+  }
+
+  .receipt-table thead {
+    display: table-header-group !important;
+  }
+
+  .receipt-table tbody {
+    display: table-row-group !important;
+  }
+
+  .receipt-table tr {
+    display: table-row !important;
+  }
+
+  .receipt-table .amount-cell {
+    text-align: right !important;
+    font-weight: bold !important;
+  }
+
+  .receipt-table tr:nth-child(even) {
+    background: #f9f9f9 !important;
+  }
+
+  .receipt-table tr.total-row {
+    background: #000 !important;
+    color: #fff !important;
+    font-weight: bold !important;
+  }
+
+  .receipt-table tr.total-row td {
+    color: #fff !important;
+    border-color: #000 !important;
+    background: #000 !important;
   }
 
   .receipt-section {
     margin-bottom: 15px;
     page-break-inside: avoid;
+    display: block !important;
+    visibility: visible !important;
   }
 
   .receipt-section h3 {
     margin: 0 0 8px 0;
+    display: block !important;
+    visibility: visible !important;
   }
 
   .receipt-row {
     padding: 4px 0;
     font-size: 12px;
+    display: block !important;
+    visibility: visible !important;
   }
 
   .receipt-row.amount-row {
@@ -282,6 +355,8 @@
   .receipt-footer {
     margin-top: 15px;
     padding-top: 10px;
+    display: block !important;
+    visibility: visible !important;
   }
 
   @page {
@@ -291,6 +366,32 @@
 
   @page :first {
     margin-top: 5mm;
+  }
+}
+
+/* Native print fallback styles */
+@media print {
+  body.printing-receipt * {
+    visibility: hidden;
+  }
+  
+  body.printing-receipt .print-receipt-modal,
+  body.printing-receipt .print-receipt-modal * {
+    visibility: visible;
+  }
+  
+  body.printing-receipt .print-receipt-overlay {
+    position: static;
+    background: white;
+  }
+  
+  body.printing-receipt .print-receipt-modal {
+    position: static;
+    box-shadow: none;
+    max-width: none;
+    width: 100%;
+    margin: 0;
+    padding: 0;
   }
 }
 
@@ -314,5 +415,331 @@
 
   .print-receipt-actions {
     flex-direction: column;
+  }
+}
+
+/* Mobile Styles (480px - 768px) */
+@media (min-width: 480px) and (max-width: 768px) {
+  .print-receipt-overlay {
+    animation: fadeIn 0.4s ease-out;
+  }
+
+  .print-receipt-modal {
+    width: 95%;
+    max-height: 95vh;
+    border-radius: 12px;
+    box-shadow: 0 15px 50px rgba(0, 0, 0, 0.25);
+    animation: slideUp 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: transform 0.3s ease;
+  }
+
+  .print-receipt-modal:hover {
+    transform: translateY(-3px);
+  }
+
+  .print-receipt-header {
+    padding: 20px 24px;
+    animation: slideInDown 0.4s ease-out 0.1s both;
+  }
+
+  .print-receipt-header h2 {
+    font-size: 20px;
+    animation: fadeIn 0.4s ease-out 0.2s both;
+  }
+
+  .print-receipt-content {
+    padding: 24px;
+    animation: fadeInUp 0.5s ease-out 0.3s both;
+  }
+
+  .receipt-section {
+    margin-bottom: 20px;
+    animation: slideInUp 0.4s ease-out both;
+    animation-delay: calc(var(--i, 0) * 0.1s + 0.4s);
+  }
+
+  .receipt-section h3 {
+    font-size: 16px;
+    animation: slideInLeft 0.3s ease-out both;
+    animation-delay: calc(var(--i, 0) * 0.1s + 0.5s);
+  }
+
+  .receipt-row {
+    padding: 10px 0;
+    animation: fadeIn 0.3s ease-out both;
+    animation-delay: calc(var(--i, 0) * 0.05s + 0.6s);
+  }
+
+  .receipt-row .label {
+    font-size: 14px;
+    animation: slideInLeft 0.3s ease-out both;
+    animation-delay: calc(var(--i, 0) * 0.05s + 0.7s);
+  }
+
+  .receipt-row .value {
+    font-size: 14px;
+    animation: slideInRight 0.3s ease-out both;
+    animation-delay: calc(var(--i, 0) * 0.05s + 0.8s);
+  }
+
+  .print-receipt-actions {
+    padding: 20px 24px;
+    animation: slideInUp 0.4s ease-out 0.5s both;
+  }
+
+  .btn {
+    padding: 10px 16px;
+    font-size: 14px;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    animation: bounceIn 0.3s ease-out both;
+    animation-delay: calc(var(--i, 0) * 0.1s + 0.6s);
+  }
+
+  .btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+  }
+}
+
+/* Tablet Styles (834px - 1024px) */
+@media (min-width: 834px) and (max-width: 1024px) {
+  .print-receipt-overlay {
+    animation: fadeIn 0.4s ease-out;
+  }
+
+  .print-receipt-modal {
+    width: 90%;
+    max-height: 92vh;
+    border-radius: 14px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    animation: slideUp 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: transform 0.3s ease;
+  }
+
+  .print-receipt-modal:hover {
+    transform: translateY(-4px);
+  }
+
+  .print-receipt-header {
+    padding: 24px 28px;
+    animation: slideInDown 0.4s ease-out 0.1s both;
+  }
+
+  .print-receipt-header h2 {
+    font-size: 22px;
+    animation: fadeIn 0.4s ease-out 0.2s both;
+  }
+
+  .print-receipt-content {
+    padding: 28px;
+    animation: fadeInUp 0.5s ease-out 0.3s both;
+  }
+
+  .receipt-section {
+    margin-bottom: 24px;
+    animation: slideInUp 0.4s ease-out both;
+    animation-delay: calc(var(--i, 0) * 0.08s + 0.4s);
+  }
+
+  .receipt-section h3 {
+    font-size: 17px;
+    animation: slideInLeft 0.3s ease-out both;
+    animation-delay: calc(var(--i, 0) * 0.08s + 0.5s);
+  }
+
+  .receipt-row {
+    padding: 12px 0;
+    animation: fadeIn 0.3s ease-out both;
+    animation-delay: calc(var(--i, 0) * 0.04s + 0.6s);
+  }
+
+  .receipt-row .label {
+    font-size: 15px;
+    animation: slideInLeft 0.3s ease-out both;
+    animation-delay: calc(var(--i, 0) * 0.04s + 0.7s);
+  }
+
+  .receipt-row .value {
+    font-size: 15px;
+    animation: slideInRight 0.3s ease-out both;
+    animation-delay: calc(var(--i, 0) * 0.04s + 0.8s);
+  }
+
+  .print-receipt-actions {
+    padding: 24px 28px;
+    animation: slideInUp 0.4s ease-out 0.5s both;
+  }
+
+  .btn {
+    padding: 11px 18px;
+    font-size: 15px;
+    border-radius: 10px;
+    transition: all 0.3s ease;
+    animation: bounceIn 0.3s ease-out both;
+    animation-delay: calc(var(--i, 0) * 0.08s + 0.6s);
+  }
+
+  .btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.25);
+  }
+}
+
+/* Laptop Styles (1440px+) */
+@media (min-width: 1440px) {
+  .print-receipt-overlay {
+    animation: fadeIn 0.4s ease-out;
+  }
+
+  .print-receipt-modal {
+    width: 85%;
+    max-height: 90vh;
+    border-radius: 16px;
+    box-shadow: 0 25px 70px rgba(0, 0, 0, 0.35);
+    animation: slideUp 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: transform 0.4s ease;
+  }
+
+  .print-receipt-modal:hover {
+    transform: translateY(-5px) scale(1.01);
+  }
+
+  .print-receipt-header {
+    padding: 28px 32px;
+    animation: slideInDown 0.4s ease-out 0.1s both;
+  }
+
+  .print-receipt-header h2 {
+    font-size: 24px;
+    animation: fadeIn 0.4s ease-out 0.2s both;
+  }
+
+  .print-receipt-content {
+    padding: 32px;
+    animation: fadeInUp 0.5s ease-out 0.3s both;
+  }
+
+  .receipt-section {
+    margin-bottom: 28px;
+    animation: slideInUp 0.4s ease-out both;
+    animation-delay: calc(var(--i, 0) * 0.06s + 0.4s);
+  }
+
+  .receipt-section h3 {
+    font-size: 18px;
+    animation: slideInLeft 0.3s ease-out both;
+    animation-delay: calc(var(--i, 0) * 0.06s + 0.5s);
+  }
+
+  .receipt-row {
+    padding: 14px 0;
+    animation: fadeIn 0.3s ease-out both;
+    animation-delay: calc(var(--i, 0) * 0.03s + 0.6s);
+  }
+
+  .receipt-row .label {
+    font-size: 16px;
+    animation: slideInLeft 0.3s ease-out both;
+    animation-delay: calc(var(--i, 0) * 0.03s + 0.7s);
+  }
+
+  .receipt-row .value {
+    font-size: 16px;
+    animation: slideInRight 0.3s ease-out both;
+    animation-delay: calc(var(--i, 0) * 0.03s + 0.8s);
+  }
+
+  .print-receipt-actions {
+    padding: 28px 32px;
+    animation: slideInUp 0.4s ease-out 0.5s both;
+  }
+
+  .btn {
+    padding: 12px 20px;
+    font-size: 16px;
+    border-radius: 12px;
+    transition: all 0.4s ease;
+    animation: bounceIn 0.3s ease-out both;
+    animation-delay: calc(var(--i, 0) * 0.06s + 0.6s);
+  }
+
+  .btn:hover {
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  }
+}
+
+/* Additional Keyframe Animations */
+@keyframes slideInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes bounceIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+  70% {
+    transform: scale(0.9);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
   }
 }

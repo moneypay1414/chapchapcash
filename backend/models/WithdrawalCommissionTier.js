@@ -1,29 +1,30 @@
 import { DataTypes } from 'sequelize';
 import sequelize from '../config/database.js';
 
-const Commission = sequelize.define('Commission', {
+const WithdrawalCommissionTier = sequelize.define('WithdrawalCommissionTier', {
   id: {
     type: DataTypes.INTEGER,
     primaryKey: true,
     autoIncrement: true
   },
-  percent: {
+  minAmount: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: false
+  },
+  maxAmount: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: false
+  },
+  agentPercent: {
     type: DataTypes.DECIMAL(5, 2),
-    allowNull: false,
     defaultValue: 0
   },
-  sendPercent: {
+  companyPercent: {
     type: DataTypes.DECIMAL(5, 2),
-    allowNull: false,
-    defaultValue: 0
-  },
-  withdrawPercent: {
-    type: DataTypes.DECIMAL(5, 2),
-    allowNull: false,
     defaultValue: 0
   }
 }, {
   timestamps: true
 });
 
-export default Commission;
+export default WithdrawalCommissionTier;

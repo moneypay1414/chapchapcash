@@ -114,12 +114,12 @@ export default function AdminUsers() {
                 </thead>
                 <tbody>
                   {filteredUsers.map(user => (
-                    <tr key={user._id}>
+                    <tr key={user.id}>
                       <td>{user.name}</td>
                       <td>{user.email}</td>
                       <td>{user.phone}</td>
                       <td><span className="badge badge-primary">{user.role}</span></td>
-                      <td>SSP {user?.balance?.toFixed(2) || '0.00'}</td>
+                      <td>SSP {(parseFloat(user?.balance) || 0).toFixed(2)}</td>
                       <td>
                         {user.isSuspended ? (
                           <span className="badge badge-danger">Suspended</span>
@@ -139,7 +139,7 @@ export default function AdminUsers() {
                           {user.isSuspended ? (
                             <button 
                               className="icon-btn"
-                              onClick={() => handleUnsuspend(user._id)}
+                              onClick={() => handleUnsuspend(user.id)}
                               title="Unsuspend"
                             >
                               ✅
@@ -147,7 +147,7 @@ export default function AdminUsers() {
                           ) : (
                             <button 
                               className="icon-btn"
-                              onClick={() => handleSuspend(user._id)}
+                              onClick={() => handleSuspend(user.id)}
                               title="Suspend"
                             >
                               🚫

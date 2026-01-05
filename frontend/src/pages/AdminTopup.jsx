@@ -91,7 +91,7 @@ export default function AdminTopup() {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          userId: userInfo._id,
+          userId: userInfo.id,
           amount: topupAmount
         })
       });

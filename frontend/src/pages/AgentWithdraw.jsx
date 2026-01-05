@@ -157,7 +157,7 @@ export default function AgentWithdraw() {
               </div>
               <div className="info-row">
                 <span className="info-label">Balance:</span>
-                <span className="info-value balance">SSP {userInfo?.balance?.toFixed(2) || '0.00'}</span>
+                <span className="info-value balance">SSP {(parseFloat(userInfo?.balance) || 0).toFixed(2)}</span>
               </div>
             </div>
           </div>

@@ -39,15 +39,23 @@ export default function PendingWithdrawals() {
     setProcessingId(requestId);
     setProcessingAction('approve');
     try {
-      await withdrawalAPI.approveRequest({ requestId });
+      // Use admin endpoint if current user is an admin
+      if (user?.role === 'admin') {
+        await withdrawalAPI.approveAdminWithdrawalRequest({ requestId });
+      } else {
+        await withdrawalAPI.approveRequest({ requestId });
+      }
       setToastMessage('Withdrawal request approved successfully');
       setToastType('success');
       setShowToast(true);
       fetchPendingRequests();
     } catch (error) {
-      setToastMessage(error.response?.data?.message || 'Failed to approve request');
+      const message = error.response?.data?.message || 'Failed to approve request';
+      setToastMessage(message);
       setToastType('error');
       setShowToast(true);
+      // If request was already processed by someone else, refresh list
+      if (error.response?.status === 409) fetchPendingRequests();
     } finally {
       setProcessingId(null);
       setProcessingAction(null);
@@ -58,15 +66,22 @@ export default function PendingWithdrawals() {
     setProcessingId(requestId);
     setProcessingAction('reject');
     try {
-      await withdrawalAPI.rejectRequest({ requestId });
+      // Use admin endpoint if current user is an admin
+      if (user?.role === 'admin') {
+        await withdrawalAPI.rejectAdminWithdrawalRequest({ requestId });
+      } else {
+        await withdrawalAPI.rejectRequest({ requestId });
+      }
       setToastMessage('Withdrawal request rejected');
       setToastType('success');
       setShowToast(true);
       fetchPendingRequests();
     } catch (error) {
-      setToastMessage(error.response?.data?.message || 'Failed to reject request');
+      const message = error.response?.data?.message || 'Failed to reject request';
+      setToastMessage(message);
       setToastType('error');
       setShowToast(true);
+      if (error.response?.status === 409) fetchPendingRequests();
     } finally {
       setProcessingId(null);
       setProcessingAction(null);
@@ -101,7 +116,7 @@ export default function PendingWithdrawals() {
         ) : (
           <div className="requests-grid">
             {pendingRequests.map((request, index) => (
-              <div key={request._id} className="request-card" style={{ animationDelay: `${index * 0.1}s` }}>
+              <div key={request.id} className="request-card" style={{ animationDelay: `${index * 0.1}s` }}>
                 <div className="card-header-section">
                   <div className="agent-info">
                     <div className="agent-avatar">🧑</div>
@@ -115,30 +130,30 @@ export default function PendingWithdrawals() {
 
                 <div className="amount-display">
                   <div className="amount-label">Withdrawal Amount</div>
-                  <div className="amount-value">SSP {request.amount.toFixed(2)}</div>
+                  <div className="amount-value">SSP {(parseFloat(request.amount) || 0).toFixed(2)}</div>
                 </div>
 
                 <div className="breakdown-section">
                   <div className="breakdown-item">
                     <span className="label">Withdrawal Amount</span>
-                    <span className="value">SSP {request.amount.toFixed(2)}</span>
+                    <span className="value">SSP {(parseFloat(request.amount) || 0).toFixed(2)}</span>
                   </div>
                   <div className="breakdown-item">
                     <span className="label">Agent Commission ({request.agentCommissionPercent || 0}%)</span>
-                    <span className="value commission">SSP {(request.agentCommission || 0).toFixed(2)}</span>
+                    <span className="value commission">SSP {(parseFloat(request.agentCommission) || 0).toFixed(2)}</span>
                   </div>
                   <div className="breakdown-item">
                     <span className="label">Company Commission ({request.companyCommissionPercent || 0}%)</span>
-                    <span className="value commission">SSP {(request.companyCommission || 0).toFixed(2)}</span>
+                    <span className="value commission">SSP {(parseFloat(request.companyCommission) || 0).toFixed(2)}</span>
                   </div>
                   <div className="breakdown-item">
                     <span className="label">Total Commission Fee</span>
-                    <span className="value commission-fee">SSP {((request.agentCommission || 0) + (request.companyCommission || 0)).toFixed(2)}</span>
+                    <span className="value commission-fee">SSP {((parseFloat(request.agentCommission) || 0) + (parseFloat(request.companyCommission) || 0)).toFixed(2)}</span>
                   </div>
                   <div className="breakdown-divider"></div>
                   <div className="breakdown-item total">
                     <span className="label">Total User Pays</span>
-                    <span className="value">SSP {(request.amount + (request.agentCommission || 0) + (request.companyCommission || 0)).toFixed(2)}</span>
+                    <span className="value">SSP {(parseFloat(request.amount) + (parseFloat(request.agentCommission) || 0) + (parseFloat(request.companyCommission) || 0)).toFixed(2)}</span>
                   </div>
                 </div>
 
@@ -149,10 +164,10 @@ export default function PendingWithdrawals() {
                 <div className="action-buttons">
                   <button
                     className="btn btn-approve-action"
-                    onClick={() => handleApprove(request._id)}
-                    disabled={processingId === request._id && processingAction === 'approve' || suspended}
+                    onClick={() => handleApprove(request.id)}
+                    disabled={processingId === request.id && processingAction === 'approve' || suspended}
                   >
-                    {processingId === request._id && processingAction === 'approve' ? (
+                    {processingId === request.id && processingAction === 'approve' ? (
                       <>
                         <span className="spinner"></span>
                         Processing...
@@ -166,10 +181,10 @@ export default function PendingWithdrawals() {
                   </button>
                   <button
                     className="btn btn-reject-action"
-                    onClick={() => handleReject(request._id)}
-                    disabled={processingId === request._id && processingAction === 'reject' || suspended}
+                    onClick={() => handleReject(request.id)}
+                    disabled={processingId === request.id && processingAction === 'reject' || suspended}
                   >
-                    {processingId === request._id && processingAction === 'reject' ? (
+                    {processingId === request.id && processingAction === 'reject' ? (
                       <>
                         <span className="spinner"></span>
                         Processing...

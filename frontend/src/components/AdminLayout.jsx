@@ -128,7 +128,6 @@ export default function AdminLayout() {
           <Link to="/admin/notifications" className="sidebar-item">🔔 Notifications</Link>
           <Link to="/admin/tiered-commission" className="sidebar-item">💰 Tiered Commission</Link>
           <Link to="/admin/currency-rates" className="sidebar-item">📊 Exchange Rates</Link>
-          <Link to="/admin/currency-converter" className="sidebar-item">💱 Currency Converter</Link>
           <Link to="/admin/money-exchange" className="sidebar-item">🔁 Money Exchange</Link>
           <Link to="/admin/state-settings" className="sidebar-item">🗺️ State Settings</Link>
           <Link to="/admin/send-state" className="sidebar-item">✈️ Send By State</Link>
@@ -164,7 +163,7 @@ export default function AdminLayout() {
                 className="exchange-rate-select"
               >
                 {currencies.map(c => (
-                  <option key={c._id} value={(c.code || '').toUpperCase()}>
+                  <option key={`${c.id}-${c.code}`} value={(c.code || '').toUpperCase()}>
                     {(c.code || '').toUpperCase()}
                   </option>
                 ))}
@@ -176,7 +175,7 @@ export default function AdminLayout() {
                 className="exchange-rate-select"
               >
                 {currencies.map(c => (
-                  <option key={c._id} value={(c.code || '').toUpperCase()}>
+                  <option key={`${c.id}-${c.code}`} value={(c.code || '').toUpperCase()}>
                     {(c.code || '').toUpperCase()}
                   </option>
                 ))}

@@ -1,32 +1,39 @@
-import mongoose from 'mongoose';
+import { DataTypes } from 'sequelize';
+import sequelize from '../config/database.js';
 
-const verificationSchema = new mongoose.Schema({
+const Verification = sequelize.define('Verification', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
+  },
   phone: {
-    type: String,
-    required: true
+    type: DataTypes.STRING,
+    allowNull: false
   },
   code: {
-    type: String,
-    required: true
+    type: DataTypes.STRING,
+    allowNull: false
   },
   purpose: {
-    type: String,
-    enum: ['registration', 'password_reset', 'transaction'],
-    required: true
+    type: DataTypes.ENUM('registration', 'password_reset', 'transaction'),
+    allowNull: false
   },
   isVerified: {
-    type: Boolean,
-    default: false
+    type: DataTypes.BOOLEAN,
+    defaultValue: false
   },
   attempts: {
-    type: Number,
-    default: 0
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now,
-    expires: 3600
+    type: DataTypes.INTEGER,
+    defaultValue: 0
   }
+}, {
+  timestamps: true,
+  indexes: [
+    { fields: ['phone'] },
+    { fields: ['purpose'] },
+    { fields: ['isVerified'] }
+  ]
 });
 
-export default mongoose.model('Verification', verificationSchema);
+export default Verification;

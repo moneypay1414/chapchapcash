@@ -87,23 +87,23 @@ export default function AdminStateSend() {
         <label>State (commission source)</label>
         <select value={stateId} onChange={(e) => setStateId(e.target.value)}>
           <option value="">-- Select state --</option>
-          {states.map(s => <option key={s._id} value={s._id}>{s.name} ({s.commissionPercent}%)</option>)}
+          {states.map(s => <option key={s.id} value={s.id}>{s.name} ({s.commissionPercent}%)</option>)}
         </select>
 
         <label>Destination Admin</label>
         <select value={toAdminId} onChange={(e) => setToAdminId(e.target.value)}>
           <option value="">-- Select admin --</option>
-          {admins.map(a => <option key={a._id} value={a._id}>{a.name} ({a.phone})</option>)}
+          {admins.map(a => <option key={a.id} value={a.id}>{a.name} ({a.phone})</option>)}
         </select>
 
         <label>Currency</label>
         <select value={currencyId} onChange={(e) => {
           setCurrencyId(e.target.value);
-          const cur = currencies.find(c => c._id === e.target.value);
+          const cur = currencies.find(c => c.id === e.target.value);
           setSelectedCurrency(cur || null);
         }}>
           <option value="">-- Select currency --</option>
-          {currencies.map(c => <option key={c._id} value={c._id}>{c.name} ({c.code}) {c.symbol ? ` ${c.symbol}` : ''}</option>)}
+          {currencies.map(c => <option key={c.id} value={c.id}>{c.name} ({c.code}) {c.symbol ? ` ${c.symbol}` : ''}</option>)}
         </select>
 
         <label>Amount</label>

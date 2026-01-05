@@ -1,9 +1,10 @@
+import { Op } from 'sequelize';
+import sequelize from '../config/database.js';
 import User from '../models/User.js';
 import WithdrawalRequest from '../models/WithdrawalRequest.js';
 import Transaction from '../models/Transaction.js';
 import Notification from '../models/Notification.js';
-import Commission from '../models/Commission.js';
-import TieredCommission from '../models/TieredCommission.js';
+import WithdrawalCommissionTier from '../models/WithdrawalCommissionTier.js';
 import { generateTransactionId } from '../utils/helpers.js';
 import { sendSMS } from '../utils/sms.js';
 import { getIO } from '../utils/socket.js';
@@ -13,12 +14,12 @@ export const requestWithdrawalFromUser = async (req, res) => {
     const { userPhone, amount } = req.body;
     const agentId = req.userId;
 
-    const agent = await User.findById(agentId);
+    const agent = await User.findByPk(agentId);
     if (!agent || agent.role !== 'agent') {
       return res.status(400).json({ message: 'Only agents can request withdrawals' });
     }
 
-    const user = await User.findOne({ phone: userPhone });
+    const user = await User.findOne({ where: { phone: userPhone } });
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
@@ -32,41 +33,51 @@ export const requestWithdrawalFromUser = async (req, res) => {
       return res.status(400).json({ message: 'User has insufficient balance' });
     }
 
-    // Get commission — try tiered commission first, fall back to flat commission
+    // Get commission — use tiered commission
     let agentCommissionPercent = 0;
     let companyCommissionPercent = 0;
 
     try {
-      const tieredDoc = await TieredCommission.findOne({ type: 'send-money' });
-      if (tieredDoc && tieredDoc.withdrawalTiers && tieredDoc.withdrawalTiers.length > 0) {
-        // Find highest tier where minAmount >= amount
-        const applicableTier = tieredDoc.withdrawalTiers
-          .filter(t => t.minAmount >= parsedAmount)
-          .sort((a, b) => a.minAmount - b.minAmount)[0];
+      const applicableTier = await WithdrawalCommissionTier.findOne({
+        where: {
+          minAmount: { [Op.lte]: parsedAmount },
+          maxAmount: { [Op.gte]: parsedAmount }
+        },
+        order: [['minAmount', 'ASC']]
+      });
+
+      if (applicableTier) {
+        agentCommissionPercent = parseFloat(applicableTier.agentPercent) || 0;
+        companyCommissionPercent = parseFloat(applicableTier.companyPercent) || 0;
+      } else {
+        // Only use defaults if no tiered commission record exists at all
+        // Default tiered commission for withdrawals: ranges
+        const defaultTiers = [
+          { minAmount: 0, maxAmount: 99, agentPercent: 0, companyPercent: 0 },
+          { minAmount: 100, maxAmount: 499, agentPercent: 1, companyPercent: 0.5 },
+          { minAmount: 500, maxAmount: 999, agentPercent: 1.5, companyPercent: 0.5 },
+          { minAmount: 1000, maxAmount: Infinity, agentPercent: 2, companyPercent: 1 }
+        ];
+        const applicableTier = defaultTiers
+          .find(t => (parseFloat(t.minAmount) || 0) <= parsedAmount && parsedAmount <= (parseFloat(t.maxAmount) || Infinity));
         
         if (applicableTier) {
           agentCommissionPercent = applicableTier.agentPercent || 0;
           companyCommissionPercent = applicableTier.companyPercent || 0;
         }
       }
+      // If tieredDoc exists but has empty withdrawalTiers array, commission remains 0 (no commission)
     } catch (err) {
       console.error('Failed to fetch tiered commission for withdrawal:', err);
-    }
-
-    // Fall back to flat commission if no tiered config
-    if (agentCommissionPercent === 0 && companyCommissionPercent === 0) {
-      const commissionDoc = await Commission.findOne();
-      agentCommissionPercent = commissionDoc?.percent || 0;
-      companyCommissionPercent = commissionDoc?.withdrawPercent ?? commissionDoc?.percent ?? 0;
     }
 
     const agentCommissionAmount = parseFloat(((parsedAmount * agentCommissionPercent) / 100).toFixed(2)) || 0;
     const companyCommissionAmount = parseFloat(((parsedAmount * companyCommissionPercent) / 100).toFixed(2)) || 0;
 
     // Create withdrawal request (pending user approval)
-    const request = new WithdrawalRequest({
-      agent: agentId,
-      user: user._id,
+    const request = await WithdrawalRequest.create({
+      agentId: agentId,
+      userId: user.id,
       amount: parsedAmount,
       agentCommission: agentCommissionAmount,
       agentCommissionPercent: agentCommissionPercent,
@@ -75,21 +86,18 @@ export const requestWithdrawalFromUser = async (req, res) => {
       status: 'pending'
     });
 
-    await request.save();
-
     // Notify user of withdrawal request
-    const notification = new Notification({
-      recipient: user._id,
+    const totalCost = parsedAmount + agentCommissionAmount + companyCommissionAmount;
+    const notification = await Notification.create({
+      recipientId: user.id,
       title: 'Withdrawal Request',
-      message: `Agent ${agent.name} requested SSP ${parsedAmount} withdrawal. Commission: SSP ${agentCommissionAmount.toFixed(2)}`,
+      message: `Agent ${agent.name} requested SSP ${parsedAmount} withdrawal. Total cost: SSP ${totalCost.toFixed(2)} (includes SSP ${agentCommissionAmount.toFixed(2)} agent fee + SSP ${companyCommissionAmount.toFixed(2)} service fee)`,
       type: 'withdrawal_request',
-      relatedTransaction: request._id
+      relatedTransactionId: request.id
     });
 
-    await notification.save();
-
     try {
-      await sendSMS(user.phone, `MoneyPay: Agent ${agent.name} requested SSP ${parsedAmount} withdrawal. Please approve or reject.`);
+      await sendSMS(user.phone, `MoneyPay: Agent ${agent.name} requested SSP ${parsedAmount} withdrawal. Total cost: SSP ${totalCost.toFixed(2)}. Please approve or reject.`);
     } catch (err) {
       console.error('SMS failed:', err);
     }
@@ -116,50 +124,62 @@ export const approveWithdrawalRequest = async (req, res) => {
     const { requestId } = req.body;
     const userId = req.userId;
 
-    const request = await WithdrawalRequest.findById(requestId);
+    const request = await WithdrawalRequest.findByPk(requestId);
     if (!request) {
       return res.status(404).json({ message: 'Request not found' });
     }
 
-    if (request.user.toString() !== userId) {
+    if (request.userId !== parseInt(userId)) {
       return res.status(403).json({ message: 'Only the user can approve their withdrawal' });
     }
 
     if (request.status !== 'pending') {
-      return res.status(400).json({ message: 'Request is not pending' });
+      return res.status(409).json({ 
+        message: `Request has already been ${request.status}`,
+        currentStatus: request.status
+      });
     }
 
     // Get user and agent
-    const user = await User.findById(userId);
-    const agent = await User.findById(request.agent);
+    const user = await User.findByPk(userId);
+    const agent = await User.findByPk(request.agentId);
 
     if (!user || !agent) {
       return res.status(404).json({ message: 'User or agent not found' });
     }
 
-    // Check balance again
-    const totalDebit = request.amount + (request.agentCommission || 0) + (request.companyCommission || 0);
-    if (user.balance < totalDebit) {
-      request.status = 'rejected';
-      request.rejectedAt = new Date();
-      await request.save();
-      return res.status(400).json({ message: 'User no longer has sufficient balance' });
+    // Check balance again (coerce DECIMAL strings to numbers)
+    const parsedAmount = parseFloat(request.amount) || 0;
+    const parsedAgentCommission = parseFloat(request.agentCommission) || 0;
+    const parsedCompanyCommission = parseFloat(request.companyCommission) || 0;
+    const userBalance = parseFloat(user.balance) || 0;
+    const agentBalance = parseFloat(agent.balance) || 0;
+
+    // User pays withdrawal amount + agent commission + company commission
+    // Agent receives: amount + agentCommission (full commission)
+    // Company gets: companyCommission
+    const totalDebit = parsedAmount + parsedAgentCommission + parsedCompanyCommission;
+    if (userBalance < totalDebit) {
+      await request.update({
+        status: 'rejected',
+        rejectedAt: new Date()
+      });
+      return res.status(409).json({ message: 'User no longer has sufficient balance', currentBalance: userBalance, required: totalDebit });
     }
 
-    // Process withdrawal: deduct from user (amount + agent commission + company commission), credit agent with amount + agent commission
-    user.balance -= totalDebit;
-    // use agentCommission (new field) if available, fall back to legacy commission
-    agent.balance = (agent.balance || 0) + request.amount + (request.agentCommission || request.commission || 0);
+    // Process withdrawal: deduct from user (amount + commissions), credit agent with amount + agent commission
+    user.balance = (userBalance - totalDebit).toFixed(2);
+    agent.balance = (agentBalance + parsedAmount + parsedAgentCommission).toFixed(2);
 
     await user.save();
     await agent.save();
 
     // Create transaction record
     const transactionId = generateTransactionId();
-    const transaction = new Transaction({
+    const transaction = await Transaction.create({
       transactionId,
-      sender: userId,
-      receiver: request.agent,
+      senderId: userId,
+      receiverId: request.agentId,
       amount: request.amount,
       type: 'user_withdraw',
       status: 'completed',
@@ -175,32 +195,27 @@ export const approveWithdrawalRequest = async (req, res) => {
       receiverBalance: agent.balance
     });
 
-    await transaction.save();
-
     // Update request status
     request.status = 'approved';
     request.approvedAt = new Date();
     await request.save();
 
     // Create notifications
-    const userNotif = new Notification({
-      recipient: userId,
+    const userNotif = await Notification.create({
+      recipientId: userId,
       title: 'Withdrawal Approved',
       message: `Your withdrawal of SSP ${request.amount} to ${agent.name} has been approved`,
       type: 'transaction',
-      relatedTransaction: transaction._id
+      relatedTransactionId: transaction.id
     });
 
-    const agentNotif = new Notification({
-      recipient: request.agent,
+    const agentNotif = await Notification.create({
+      recipientId: request.agentId,
       title: 'Withdrawal Approved',
       message: `${user.name} approved your withdrawal request of SSP ${request.amount}`,
       type: 'transaction',
-      relatedTransaction: transaction._id
+      relatedTransactionId: transaction.id
     });
-
-    await userNotif.save();
-    await agentNotif.save();
 
     // Emit socket events
     try {
@@ -208,23 +223,23 @@ export const approveWithdrawalRequest = async (req, res) => {
       if (io) {
         io.to(`user-${userId}`).emit('balance-updated', {
           userId,
-          balance: user.balance
+          balance: parseFloat(user.balance)
         });
 
-        io.to(`user-${request.agent}`).emit('balance-updated', {
-          userId: request.agent,
-          balance: agent.balance
+        io.to(`user-${request.agentId}`).emit('balance-updated', {
+          userId: request.agentId,
+          balance: parseFloat(agent.balance)
         });
 
         io.to(`user-${userId}`).emit('new-notification', {
-          recipient: userId,
+          recipientId: userId,
           title: userNotif.title,
           message: userNotif.message,
           type: userNotif.type
         });
 
-        io.to(`user-${request.agent}`).emit('new-notification', {
-          recipient: request.agent,
+        io.to(`user-${request.agentId}`).emit('new-notification', {
+          recipientId: request.agentId,
           title: agentNotif.title,
           message: agentNotif.message,
           type: agentNotif.type
@@ -236,7 +251,7 @@ export const approveWithdrawalRequest = async (req, res) => {
 
     res.json({
       message: 'Withdrawal request approved',
-      transaction: { _id: transaction._id, transactionId, amount: request.amount }
+      transaction: { id: transaction.id, transactionId, amount: request.amount }
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -248,45 +263,46 @@ export const rejectWithdrawalRequest = async (req, res) => {
     const { requestId, reason } = req.body;
     const userId = req.userId;
 
-    const request = await WithdrawalRequest.findById(requestId);
+    const request = await WithdrawalRequest.findByPk(requestId);
     if (!request) {
       return res.status(404).json({ message: 'Request not found' });
     }
 
-    if (request.user.toString() !== userId) {
+    if (request.userId !== parseInt(userId)) {
       return res.status(403).json({ message: 'Only the user can reject their withdrawal' });
     }
 
     if (request.status !== 'pending') {
-      return res.status(400).json({ message: 'Request is not pending' });
+      return res.status(409).json({ 
+        message: `Request has already been ${request.status}`,
+        currentStatus: request.status
+      });
     }
 
-    request.status = 'rejected';
-    request.rejectedAt = new Date();
-    request.reason = reason;
-    await request.save();
+    await request.update({
+      status: 'rejected',
+      rejectedAt: new Date(),
+      reason: reason
+    });
 
     // Get user and agent for notification
-    const user = await User.findById(userId);
-    const agent = await User.findById(request.agent);
+    const user = await User.findByPk(userId);
+    const agent = await User.findByPk(request.agentId);
 
     // Create notifications
-    const userNotif = new Notification({
-      recipient: userId,
+    const userNotif = await Notification.create({
+      recipientId: userId,
       title: 'Withdrawal Rejected',
       message: `Your withdrawal request has been rejected`,
       type: 'system'
     });
 
-    const agentNotif = new Notification({
-      recipient: request.agent,
+    const agentNotif = await Notification.create({
+      recipientId: request.agentId,
       title: 'Withdrawal Rejected',
       message: `${user.name} rejected your withdrawal request of SSP ${request.amount}`,
       type: 'system'
     });
-
-    await userNotif.save();
-    await agentNotif.save();
 
     // Emit socket events
     try {
@@ -299,8 +315,8 @@ export const rejectWithdrawalRequest = async (req, res) => {
           type: userNotif.type
         });
 
-        io.to(`user-${request.agent}`).emit('new-notification', {
-          recipient: request.agent,
+        io.to(`user-${request.agentId}`).emit('new-notification', {
+          recipientId: request.agentId,
           title: agentNotif.title,
           message: agentNotif.message,
           type: agentNotif.type
@@ -320,12 +336,16 @@ export const getPendingWithdrawalRequests = async (req, res) => {
   try {
     const userId = req.userId;
 
-    const requests = await WithdrawalRequest.find({
-      user: userId,
-      status: 'pending'
-    })
-      .populate('agent', 'name phone agentId')
-      .sort({ createdAt: -1 });
+    const requests = await WithdrawalRequest.findAll({
+      where: {
+        userId: userId,
+        status: 'pending'
+      },
+      include: [
+        { model: User, as: 'agent', attributes: ['name', 'phone', 'agentId'] }
+      ],
+      order: [['createdAt', 'DESC']]
+    });
 
     res.json({ requests });
   } catch (error) {

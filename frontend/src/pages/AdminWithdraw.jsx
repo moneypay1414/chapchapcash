@@ -80,7 +80,7 @@ export default function AdminWithdraw() {
           setAmount('');
         } else if (data.agent) {
           // Immediate processing returned updated agent object
-          setSuccess(`Withdrawal successful! Agent new balance: SSP ${data.agent?.balance?.toFixed(2) || '0.00'}`);
+          setSuccess(`Withdrawal successful! Agent new balance: SSP ${(parseFloat(data.agent?.balance) || 0).toFixed(2)}`);
           // Merge returned agent data with existing displayed info,
           // but preserve the agent's `autoAdminCashout` flag unless the server explicitly returned it.
           setAgentInfo((prev) => {
@@ -151,7 +151,7 @@ export default function AdminWithdraw() {
                 <div className="mb-2">
                   <span className="text-muted">Current Balance: </span>
                   <span className="text-danger font-weight-bold" style={{ fontSize: '18px' }}>
-                    SSP {agentInfo.balance?.toFixed(2) || '0.00'}
+                    SSP {(parseFloat(agentInfo.balance) || 0).toFixed(2)}
                   </span>
                 </div>
                 <div>

@@ -1,17 +1,37 @@
 import { create } from 'zustand';
 
 export const useAuthStore = create((set) => ({
-  user: JSON.parse(localStorage.getItem('user') || 'null'),
+  user: (() => {
+    const stored = localStorage.getItem('user');
+    if (stored) {
+      try {
+        const user = JSON.parse(stored);
+        // Ensure balance is a number
+        if (user && typeof user.balance === 'string') {
+          user.balance = parseFloat(user.balance) || 0;
+        }
+        return user;
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
+  })(),
   token: localStorage.getItem('token') || null,
   isAuthenticated: !!localStorage.getItem('token'),
   theme: localStorage.getItem('theme') || 'light',
 
   login: (user, token) => {
-    localStorage.setItem('user', JSON.stringify(user));
+    // Ensure balance is a number
+    const processedUser = { ...user };
+    if (typeof processedUser.balance === 'string') {
+      processedUser.balance = parseFloat(processedUser.balance) || 0;
+    }
+    localStorage.setItem('user', JSON.stringify(processedUser));
     localStorage.setItem('token', token);
-    localStorage.setItem('theme', user.theme || 'light');
-    document.documentElement.setAttribute('data-theme', user.theme || 'light');
-    set({ user, token, isAuthenticated: true, theme: user.theme || 'light' });
+    localStorage.setItem('theme', processedUser.theme || 'light');
+    document.documentElement.setAttribute('data-theme', processedUser.theme || 'light');
+    set({ user: processedUser, token, isAuthenticated: true, theme: processedUser.theme || 'light' });
   },
 
   logout: () => {
@@ -23,13 +43,18 @@ export const useAuthStore = create((set) => ({
   },
 
   updateUser: (user) => {
-    localStorage.setItem('user', JSON.stringify(user));
-    if (user.theme) {
-      localStorage.setItem('theme', user.theme);
-      document.documentElement.setAttribute('data-theme', user.theme);
-      set({ user, theme: user.theme });
+    // Ensure balance is a number
+    const processedUser = { ...user };
+    if (typeof processedUser.balance === 'string') {
+      processedUser.balance = parseFloat(processedUser.balance) || 0;
+    }
+    localStorage.setItem('user', JSON.stringify(processedUser));
+    if (processedUser.theme) {
+      localStorage.setItem('theme', processedUser.theme);
+      document.documentElement.setAttribute('data-theme', processedUser.theme);
+      set({ user: processedUser, theme: processedUser.theme });
     } else {
-      set({ user });
+      set({ user: processedUser });
     }
   },
 
@@ -44,6 +69,10 @@ export const useAuthStore = create((set) => ({
 window.addEventListener('mpay:user-updated', (e) => {
   try {
     const updated = e.detail;
+    // Ensure balance is a number
+    if (updated && typeof updated.balance === 'string') {
+      updated.balance = parseFloat(updated.balance) || 0;
+    }
     // Access store setter by calling the zustand hook setter
     // We directly call localStorage and set to keep this simple
     const store = useAuthStore.getState();

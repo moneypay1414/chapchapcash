@@ -43,54 +43,29 @@ export default function AdminMoneyExchange() {
     return () => { mounted = false; };
   }, []);
 
-  const convert = () => {
+  const convert = async () => {
     setUsedPair(null);
     setResult('');
     const a = Number(amount || 0);
     if (!from || !to || !a) return;
 
-    // prefer direct pair
-    const pair = pairRates.find(p => (p.fromCode||'').toUpperCase() === from.toUpperCase() && (p.toCode||'').toUpperCase() === to.toUpperCase());
-    const inverse = pairRates.find(p => (p.fromCode||'').toUpperCase() === to.toUpperCase() && (p.toCode||'').toUpperCase() === from.toUpperCase());
-
-    if (pair) {
-      const key = priceMode === 'buying' ? 'buyingPrice' : 'sellingPrice';
-      const val = pair[key];
-      if (val !== undefined && val !== null && val !== '') {
-        setUsedPair({ pair, inverse: false });
-        setResult((a * Number(val)).toFixed(4));
-        return;
+    try {
+      const response = await adminAPI.convertMoneyExchange({
+        amount: a,
+        fromCurrency: from,
+        toCurrency: to,
+        priceMode
+      });
+      const data = response?.data || response;
+      if (data && data.convertedAmount !== undefined) {
+        setResult(data.convertedAmount);
+        setUsedPair(data.usedPair);
+      } else {
+        setResult('Error: Invalid response from server');
       }
-    }
-
-    if (inverse) {
-      const invKey = priceMode === 'buying' ? 'sellingPrice' : 'buyingPrice';
-      const invVal = inverse[invKey];
-      if (invVal !== undefined && invVal !== null && invVal !== '' && Number(invVal) !== 0) {
-        setUsedPair({ pair: inverse, inverse: true });
-        setResult((a / Number(invVal)).toFixed(6));
-        return;
-      }
-    }
-
-    // fallback: try currency-level effective rates (if available)
-    const f = currencies.find(c => (c.code||'').toUpperCase() === from.toUpperCase());
-    const t = currencies.find(c => (c.code||'').toUpperCase() === to.toUpperCase());
-    if (!f || !t) return;
-    const getEff = (cur, side) => {
-      const pt = cur.priceType || 'fixed';
-      if (pt === 'fixed') {
-        const v = side === 'buying' ? cur.buyingPrice : cur.sellingPrice;
-        if (v !== undefined && v !== null && v !== '') return Number(v);
-        if ((cur.code||'').toUpperCase() === 'SSP') return 1;
-        return null;
-      }
-      return null;
-    };
-    const fromRate = priceMode === 'buying' ? getEff(f, 'selling') : getEff(f, 'buying');
-    const toRate = priceMode === 'buying' ? getEff(t, 'buying') : getEff(t, 'selling');
-    if (fromRate != null && toRate != null && Number(toRate) !== 0) {
-      setResult((a * (Number(fromRate) / Number(toRate))).toFixed(4));
+    } catch (error) {
+      console.error('Conversion failed:', error);
+      setResult('Error: ' + (error.response?.data?.message || error.message));
     }
   };
 
@@ -145,8 +120,8 @@ export default function AdminMoneyExchange() {
                   <div style={{fontSize:12, color:'#666'}}>From</div>
                   <div style={{fontWeight:700}}>{(usedPair.pair.fromCode || '').toUpperCase()}</div>
                   <div style={{marginLeft:'auto', display:'flex', gap:8}}>
-                    <span className="price-badge buying-badge">Buy {usedPair.pair.buyingPrice ?? '—'}</span>
-                    <span className="price-badge selling-badge">Sell {usedPair.pair.sellingPrice ?? '—'}</span>
+                    <span className="price-badge buying-badge">Buy {usedPair.pair.buyingPrice ? Math.round(usedPair.pair.buyingPrice) : '—'}</span>
+                    <span className="price-badge selling-badge">Sell {usedPair.pair.sellingPrice ? Math.round(usedPair.pair.sellingPrice) : '—'}</span>
                   </div>
                 </div>
               )}
@@ -185,8 +160,8 @@ export default function AdminMoneyExchange() {
                   <div style={{fontSize:12, color:'#666'}}>To</div>
                   <div style={{fontWeight:700}}>{(usedPair.pair.toCode || '').toUpperCase()}</div>
                   <div style={{marginLeft:'auto', display:'flex', gap:8}}>
-                    <span className="price-badge buying-badge">Buy {usedPair.pair.buyingPrice ?? '—'}</span>
-                    <span className="price-badge selling-badge">Sell {usedPair.pair.sellingPrice ?? '—'}</span>
+                    <span className="price-badge buying-badge">Buy {usedPair.pair.buyingPrice ? Math.round(usedPair.pair.buyingPrice) : '—'}</span>
+                    <span className="price-badge selling-badge">Sell {usedPair.pair.sellingPrice ? Math.round(usedPair.pair.sellingPrice) : '—'}</span>
                   </div>
                 </div>
               )}

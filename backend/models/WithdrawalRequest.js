@@ -1,58 +1,85 @@
-import mongoose from 'mongoose';
+import { DataTypes } from 'sequelize';
+import sequelize from '../config/database.js';
 
-const withdrawalRequestSchema = new mongoose.Schema({
-  agent: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
+const WithdrawalRequest = sequelize.define('WithdrawalRequest', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
   },
-  user: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
+  agentId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    references: {
+      model: 'Users',
+      key: 'id'
+    }
+  },
+  userId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    references: {
+      model: 'Users',
+      key: 'id'
+    }
   },
   amount: {
-    type: Number,
-    required: true
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: false
   },
   agentCommission: {
-    type: Number,
-    default: 0
+    type: DataTypes.DECIMAL(10, 2),
+    defaultValue: 0
   },
   agentCommissionPercent: {
-    type: Number,
-    default: 0
+    type: DataTypes.DECIMAL(5, 2),
+    defaultValue: 0
   },
-  // company commission for this withdrawal request
   companyCommission: {
-    type: Number,
-    default: 0
+    type: DataTypes.DECIMAL(10, 2),
+    defaultValue: 0
   },
   companyCommissionPercent: {
-    type: Number,
-    default: 0
+    type: DataTypes.DECIMAL(5, 2),
+    defaultValue: 0
   },
-  // Legacy fields for backwards compatibility
   commission: {
-    type: Number,
-    default: 0
+    type: DataTypes.DECIMAL(10, 2),
+    defaultValue: 0
   },
   commissionPercent: {
-    type: Number,
-    default: 0
+    type: DataTypes.DECIMAL(5, 2),
+    defaultValue: 0
   },
   status: {
-    type: String,
-    enum: ['pending', 'approved', 'rejected', 'cancelled'],
-    default: 'pending'
+    type: DataTypes.ENUM('pending', 'approved', 'rejected', 'cancelled'),
+    defaultValue: 'pending'
   },
-  reason: String,
-  createdAt: {
-    type: Date,
-    default: Date.now
+  reason: {
+    type: DataTypes.TEXT,
+    allowNull: true
   },
-  approvedAt: Date,
-  rejectedAt: Date
+  approvedAt: {
+    type: DataTypes.DATE,
+    allowNull: true
+  },
+  rejectedAt: {
+    type: DataTypes.DATE,
+    allowNull: true
+  }
+}, {
+  timestamps: true,
+  indexes: [
+    { fields: ['agentId'] },
+    { fields: ['userId'] },
+    { fields: ['status'] }
+  ]
 });
 
-export default mongoose.model('WithdrawalRequest', withdrawalRequestSchema);
+// Define associations
+WithdrawalRequest.associate = (models) => {
+  WithdrawalRequest.belongsTo(models.User, { foreignKey: 'agentId', as: 'agent' });
+  WithdrawalRequest.belongsTo(models.User, { foreignKey: 'userId', as: 'user' });
+};
+
+export default WithdrawalRequest;

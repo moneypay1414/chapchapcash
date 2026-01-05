@@ -1,23 +1,54 @@
-import mongoose from 'mongoose';
+import { DataTypes } from 'sequelize';
+import sequelize from '../config/database.js';
 
-const currencySchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  code: { type: String, required: true },
-  symbol: { type: String, default: '' },
-  // countries that belong to this tier (array of country names or ISO codes)
-  countries: [{ type: String }],
-  // exchange rate relative to platform base currency (e.g. SSP)
-  exchangeRate: { type: Number },
-  // selling price (what admin charges when users buy this currency)
-  sellingPrice: { type: Number },
-  // buying price (what admin pays when users sell this currency)
-  buyingPrice: { type: Number },
-  // price type: 'fixed' or 'percentage'
-  priceType: { type: String, enum: ['fixed', 'percentage'], default: 'fixed' },
-  // optional tier name
-  tier: { type: String },
-  createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now }
+const Currency = sequelize.define('Currency', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
+  },
+  name: {
+    type: DataTypes.STRING,
+    allowNull: false
+  },
+  code: {
+    type: DataTypes.STRING,
+    allowNull: false
+  },
+  symbol: {
+    type: DataTypes.STRING,
+    defaultValue: ''
+  },
+  countries: {
+    type: DataTypes.JSON,
+    allowNull: true
+  },
+  exchangeRate: {
+    type: DataTypes.DECIMAL(10, 4),
+    allowNull: true
+  },
+  sellingPrice: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true
+  },
+  buyingPrice: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true
+  },
+  priceType: {
+    type: DataTypes.ENUM('fixed', 'percentage'),
+    defaultValue: 'fixed'
+  },
+  tier: {
+    type: DataTypes.STRING,
+    allowNull: true
+  }
+}, {
+  timestamps: true,
+  indexes: [
+    { unique: true, fields: ['code'] },
+    { fields: ['tier'] }
+  ]
 });
 
-export default mongoose.model('Currency', currencySchema);
+export default Currency;

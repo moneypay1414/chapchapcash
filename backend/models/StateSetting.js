@@ -1,10 +1,26 @@
-import mongoose from 'mongoose';
+import { DataTypes } from 'sequelize';
+import sequelize from '../config/database.js';
 
-const stateSettingSchema = new mongoose.Schema({
-  name: { type: String, required: true, unique: true },
-  commissionPercent: { type: Number, default: 0 },
-  createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now }
+const StateSetting = sequelize.define('StateSetting', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
+  },
+  name: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    unique: true
+  },
+  commissionPercent: {
+    type: DataTypes.DECIMAL(5, 2),
+    defaultValue: 0
+  }
+}, {
+  timestamps: true,
+  indexes: [
+    { unique: true, fields: ['name'] }
+  ]
 });
 
-export default mongoose.model('StateSetting', stateSettingSchema);
+export default StateSetting;

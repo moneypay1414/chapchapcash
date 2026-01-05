@@ -171,14 +171,14 @@ export default function AdminTransactions() {
                       <td>{tx.sender?.phone}</td>
                       <td>{tx.receiver?.phone || '-'}</td>
                       <td style={{ fontSize: '0.85rem' }}>
-                        {tx.senderLocation && <div>From: {tx.senderLocation.city}, {tx.senderLocation.country}</div>}
-                        {tx.receiverLocation && <div>To: {tx.receiverLocation.city}, {tx.receiverLocation.country}</div>}
-                        {!tx.senderLocation && !tx.receiverLocation && '-'}
+                        {tx.sender && <div>From: {tx.sender.name || tx.sender.phone}</div>}
+                        {tx.receiver && <div>To: {tx.receiver.name || tx.receiver.phone}</div>}
+                        {!tx.sender && !tx.receiver && '-'}
                       </td>
                       <td>
                         <span className="badge badge-primary">{tx.type}</span>
                       </td>
-                      <td>SSP {tx.amount.toFixed(2)}</td>
+                      <td>SSP {(parseFloat(tx.amount) || 0).toFixed(2)}</td>
                       <td>
                         <span className={`badge ${getStatusBadge(tx.status)}`}>
                           {tx.status}

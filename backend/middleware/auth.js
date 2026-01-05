@@ -35,7 +35,9 @@ export const agentMiddleware = (req, res, next) => {
 export const notSuspended = async (req, res, next) => {
   try {
     if (!req.userId) return res.status(401).json({ message: 'No user id found' });
-    const user = await User.findById(req.userId).select('isSuspended');
+    const user = await User.findByPk(req.userId, {
+      attributes: ['isSuspended']
+    });
     if (!user) return res.status(404).json({ message: 'User not found' });
     if (user.isSuspended) {
       return res.status(403).json({ message: 'Your account has been suspended' });

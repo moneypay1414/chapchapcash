@@ -2,12 +2,13 @@ import User from '../models/User.js';
 import { hashPassword, comparePassword, generateToken, generateVerificationCode, reverseGeocode } from '../utils/helpers.js';
 import { sendVerificationCode } from '../utils/sms.js';
 import Verification from '../models/Verification.js';
+import { Op } from 'sequelize';
 
 export const register = async (req, res) => {
   try {
     const { name, email, phone, password, role, agentId } = req.body;
 
-    const existingUser = await User.findOne({ $or: [{ email }, { phone }] });
+    const existingUser = await User.findOne({ where: { [Op.or]: [{ email }, { phone }] } });
     if (existingUser) {
       return res.status(400).json({ message: 'User already exists' });
     }
@@ -20,14 +21,14 @@ export const register = async (req, res) => {
         let isUnique = false;
         while (!isUnique) {
           finalAgentId = Math.floor(Math.random() * 900000) + 100000;
-          const existing = await User.findOne({ agentId: finalAgentId.toString() });
+          const existing = await User.findOne({ where: { agentId: finalAgentId.toString() } });
           if (!existing) {
             isUnique = true;
           }
         }
       } else {
         // Verify provided agentId is unique
-        const existingAgent = await User.findOne({ agentId });
+        const existingAgent = await User.findOne({ where: { agentId } });
         if (existingAgent) {
           return res.status(400).json({ message: 'Agent ID already exists' });
         }
@@ -40,7 +41,7 @@ export const register = async (req, res) => {
       let isUnique = false;
       while (!isUnique) {
         finalAdminId = Math.floor(Math.random() * 900000) + 100000;
-        const existing = await User.findOne({ adminId: finalAdminId.toString() });
+        const existing = await User.findOne({ where: { adminId: finalAdminId.toString() } });
         if (!existing) {
           isUnique = true;
         }
@@ -52,7 +53,7 @@ export const register = async (req, res) => {
 
     console.log('Registering user:', { name, email, phone, role, finalAgentId, finalAdminId });
 
-    const user = new User({
+    const user = await User.create({
       name,
       email,
       phone,
@@ -64,8 +65,6 @@ export const register = async (req, res) => {
       verificationExpiry: new Date(Date.now() + 10 * 60000)
     });
 
-    await user.save();
-
     // Send SMS verification code
     try {
       await sendVerificationCode(phone, verificationCode);
@@ -75,7 +74,7 @@ export const register = async (req, res) => {
 
     res.status(201).json({
       message: 'User registered. Please verify your phone number.',
-      userId: user._id,
+      userId: user.id,
       phone: user.phone,
       agentId: finalAgentId || null,
       adminId: finalAdminId || null
@@ -89,7 +88,7 @@ export const verifyPhone = async (req, res) => {
   try {
     const { phone, code } = req.body;
 
-    const user = await User.findOne({ phone });
+    const user = await User.findOne({ where: { phone } });
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
@@ -113,7 +112,7 @@ export const login = async (req, res) => {
   try {
     const { email, password, latitude, longitude } = req.body;
 
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ where: { email } });
     if (!user) {
       return res.status(401).json({ message: 'Invalid credentials' });
     }
@@ -170,17 +169,17 @@ export const login = async (req, res) => {
       }
     }
 
-    const token = generateToken(user._id, user.role);
+    const token = generateToken(user.id, user.role);
 
     res.json({
       token,
       user: {
-        _id: user._id,
+        id: user.id,
         name: user.name,
         email: user.email,
         phone: user.phone,
         role: user.role,
-        balance: user.balance,
+        balance: parseFloat(user.balance) || 0,
         isVerified: user.isVerified,
         agentId: user.agentId || null,
         adminId: user.adminId || null,
@@ -197,8 +196,13 @@ export const login = async (req, res) => {
 
 export const getProfile = async (req, res) => {
   try {
-    const user = await User.findById(req.userId).select('-password');
-    res.json(user);
+    const user = await User.findByPk(req.userId, {
+      attributes: { exclude: ['password'] }
+    });
+    // Ensure balance is returned as a number
+    const userData = user.toJSON();
+    userData.balance = parseFloat(userData.balance) || 0;
+    res.json(userData);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -216,13 +220,17 @@ export const updateProfile = async (req, res) => {
     if (typeof autoAdminCashout !== 'undefined') update.autoAdminCashout = !!autoAdminCashout;
     if (typeof theme !== 'undefined') update.theme = theme;
 
-    const user = await User.findByIdAndUpdate(
-      req.userId,
-      update,
-      { new: true }
-    ).select('-password');
+    const user = await User.update(update, {
+      where: { id: req.userId },
+      returning: true
+    });
 
-    res.json(user);
+    // Get the updated user
+    const updatedUser = await User.findByPk(req.userId, {
+      attributes: { exclude: ['password'] }
+    });
+
+    res.json(updatedUser);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -236,7 +244,10 @@ export const checkUserBalance = async (req, res) => {
       return res.status(400).json({ message: 'Phone number is required' });
     }
 
-    const user = await User.findOne({ phone }).select('_id name phone balance isVerified isSuspended');
+    const user = await User.findOne({
+      where: { phone },
+      attributes: ['id', 'name', 'phone', 'balance', 'isVerified', 'isSuspended']
+    });
 
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
@@ -247,10 +258,10 @@ export const checkUserBalance = async (req, res) => {
     }
 
     res.json({
-      _id: user._id,
+      id: user.id,
       name: user.name,
       phone: user.phone,
-      balance: user.balance,
+      balance: parseFloat(user.balance) || 0,
       isVerified: user.isVerified
     });
   } catch (error) {

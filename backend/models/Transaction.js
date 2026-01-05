@@ -1,93 +1,125 @@
-import mongoose from 'mongoose';
+import { DataTypes } from 'sequelize';
+import sequelize from '../config/database.js';
 
-const transactionSchema = new mongoose.Schema({
+const Transaction = sequelize.define('Transaction', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
+  },
   transactionId: {
-    type: String,
-    unique: true,
-    required: true
+    type: DataTypes.STRING,
+    allowNull: false,
+    unique: true
   },
-  sender: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
+  senderId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    references: {
+      model: 'Users',
+      key: 'id'
+    }
   },
-  receiver: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
+  receiverId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: {
+      model: 'Users',
+      key: 'id'
+    }
   },
   amount: {
-    type: Number,
-    required: true
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: false
   },
   type: {
-    type: String,
-    enum: ['transfer', 'topup', 'withdrawal', 'user_withdraw', 'agent_deposit', 'agent_cash_out_money', 'admin_push', 'admin_state_push', 'money_exchange'],
-    required: true
+    type: DataTypes.ENUM('transfer', 'topup', 'withdrawal', 'user_withdraw', 'agent_deposit', 'agent_cash_out_money', 'admin_push', 'admin_state_push', 'money_exchange'),
+    allowNull: false
   },
   status: {
-    type: String,
-    enum: ['pending', 'completed', 'failed', 'cancelled'],
-    default: 'pending'
+    type: DataTypes.ENUM('pending', 'completed', 'failed', 'cancelled'),
+    defaultValue: 'pending'
   },
-  description: String,
+  description: {
+    type: DataTypes.TEXT,
+    allowNull: true
+  },
   commission: {
-    type: Number,
-    default: 0
+    type: DataTypes.DECIMAL(10, 2),
+    defaultValue: 0
   },
   commissionPercent: {
-    type: Number,
-    default: 0
+    type: DataTypes.DECIMAL(5, 2),
+    defaultValue: 0
   },
-  // Agent commission (amount paid to the agent for this transaction)
   agentCommission: {
-    type: Number,
-    default: 0
+    type: DataTypes.DECIMAL(10, 2),
+    defaultValue: 0
   },
   agentCommissionPercent: {
-    type: Number,
-    default: 0
+    type: DataTypes.DECIMAL(5, 2),
+    defaultValue: 0
   },
-  // Company commission (fee) collected for this transaction
   companyCommission: {
-    type: Number,
-    default: 0
+    type: DataTypes.DECIMAL(10, 2),
+    defaultValue: 0
   },
   companyCommissionPercent: {
-    type: Number,
-    default: 0
+    type: DataTypes.DECIMAL(5, 2),
+    defaultValue: 0
   },
-  // Amount the receiver should be credited when a pending transaction is completed
   receiverCredit: {
-    type: Number,
-    default: null
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true
   },
-  // Currency information for the transaction (selected by admin)
-  currencyCode: { type: String },
-  currencySymbol: { type: String },
-  exchangeRate: { type: Number, default: 1 },
-  currencyTier: { type: String },
-  senderBalance: Number,
-  receiverBalance: Number,
+  currencyCode: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  currencySymbol: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  exchangeRate: {
+    type: DataTypes.DECIMAL(10, 4),
+    defaultValue: 1
+  },
+  currencyTier: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  senderBalance: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true
+  },
+  receiverBalance: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true
+  },
   senderLocation: {
-    latitude: Number,
-    longitude: Number,
-    city: String,
-    country: String
+    type: DataTypes.JSON,
+    allowNull: true
   },
   receiverLocation: {
-    latitude: Number,
-    longitude: Number,
-    city: String,
-    country: String
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now
+    type: DataTypes.JSON,
+    allowNull: true
   }
+}, {
+  timestamps: true,
+  indexes: [
+    { unique: true, fields: ['transactionId'] },
+    { fields: ['senderId'] },
+    { fields: ['receiverId'] },
+    { fields: ['status'] },
+    { fields: ['type'] }
+  ]
 });
 
-export default mongoose.model('Transaction', transactionSchema);
+// Define associations
+Transaction.associate = (models) => {
+  Transaction.belongsTo(models.User, { foreignKey: 'senderId', as: 'sender' });
+  Transaction.belongsTo(models.User, { foreignKey: 'receiverId', as: 'receiver' });
+  Transaction.hasMany(models.Notification, { foreignKey: 'relatedTransactionId', as: 'notifications' });
+};
+
+export default Transaction;

@@ -1,4 +1,5 @@
-import mongoose from 'mongoose';
+import { Op } from 'sequelize';
+import sequelize from '../config/database.js';
 import Transaction from '../models/Transaction.js';
 import User from '../models/User.js';
 import Notification from '../models/Notification.js';
@@ -6,40 +7,51 @@ import WithdrawalRequest from '../models/WithdrawalRequest.js';
 import { generateTransactionId } from '../utils/helpers.js';
 import { sendSMS, sendTransactionSMS } from '../utils/sms.js';
 import { getIO } from '../utils/socket.js';
-import Commission from '../models/Commission.js';
-import TieredCommission from '../models/TieredCommission.js';
+import SendMoneyCommissionTier from '../models/SendMoneyCommissionTier.js';
+import WithdrawalCommissionTier from '../models/WithdrawalCommissionTier.js';
 
 export const sendMoney = async (req, res) => {
   try {
     const { recipientPhone, description } = req.body;
     const amount = parseFloat(req.body.amount);
-    const sender = await User.findById(req.userId);
+    const sender = await User.findByPk(req.userId);
 
     if (!sender) {
       return res.status(404).json({ message: 'Sender not found' });
     }
 
-    // fetch company commission percent for send — try tiered commission first
+    // fetch company commission percent for send — use tiered commission
     let companyPercent = 0;
-    const tieredDoc = await TieredCommission.findOne({ type: 'send-money' });
-    if (tieredDoc && tieredDoc.tiers.length > 0) {
-      // Find the lowest tier whose minAmount >= amount (smallest qualifying tier)
-      const applicableTier = tieredDoc.tiers
-        .filter(t => t.minAmount >= amount)
-        .sort((a, b) => a.minAmount - b.minAmount)[0];
-      companyPercent = applicableTier ? applicableTier.companyPercent : 0;
+    const applicableTier = await SendMoneyCommissionTier.findOne({
+      where: {
+        minAmount: { [Op.lte]: amount },
+        maxAmount: { [Op.gte]: amount }
+      },
+      order: [['minAmount', 'ASC']]
+    });
+
+    if (applicableTier) {
+      companyPercent = parseFloat(applicableTier.companyPercent) || 0;
     } else {
-      // Fallback to old Commission model (flat sendPercent)
-      const commissionDoc = await Commission.findOne();
-      companyPercent = commissionDoc?.sendPercent ?? commissionDoc?.percent ?? 0;
+      // Default tiered commission: ranges for send-money
+      const defaultTiers = [
+        { minAmount: 0, maxAmount: 99, companyPercent: 0 },
+        { minAmount: 100, maxAmount: 499, companyPercent: 1 },
+        { minAmount: 500, maxAmount: 999, companyPercent: 2 },
+        { minAmount: 1000, maxAmount: Infinity, companyPercent: 3 }
+      ];
+      const defaultTier = defaultTiers
+        .find(t => (parseFloat(t.minAmount) || 0) <= amount && amount <= (parseFloat(t.maxAmount) || Infinity));
+      companyPercent = defaultTier ? defaultTier.companyPercent : 0;
     }
+    // If tieredDoc exists but has empty tiers array, companyPercent remains 0 (no commission)
     const companyCommission = parseFloat(((amount * companyPercent) / 100).toFixed(2)) || 0;
 
-    if (sender.balance < amount + companyCommission) {
+    if (parseFloat(sender.balance) < amount + companyCommission) {
       return res.status(400).json({ message: 'Insufficient balance' });
     }
 
-    const recipient = await User.findOne({ phone: recipientPhone });
+    const recipient = await User.findOne({ where: { phone: recipientPhone } });
     if (!recipient) {
       return res.status(404).json({ message: 'Recipient not found' });
     }
@@ -50,21 +62,21 @@ export const sendMoney = async (req, res) => {
     }
 
     const transactionId = generateTransactionId();
-    const senderPreviousBalance = sender.balance;
-    const receiverPreviousBalance = recipient.balance;
+    const senderPreviousBalance = parseFloat(sender.balance);
+    const receiverPreviousBalance = parseFloat(recipient.balance);
 
     // Update balances (sender pays company fee in addition to amount)
-    sender.balance -= (amount + companyCommission);
-    recipient.balance += amount;
+    sender.balance = senderPreviousBalance - (amount + companyCommission);
+    recipient.balance = receiverPreviousBalance + amount;
 
     await sender.save();
     await recipient.save();
 
     // Create transaction record
-    const transaction = new Transaction({
+    const transaction = await Transaction.create({
       transactionId,
-      sender: req.userId,
-      receiver: recipient._id,
+      senderId: req.userId,
+      receiverId: recipient.id,
       amount,
       type: 'transfer',
       status: 'completed',
@@ -77,27 +89,22 @@ export const sendMoney = async (req, res) => {
       companyCommissionPercent: companyPercent
     });
 
-    await transaction.save();
-
     // Create notifications
-    const senderNotif = new Notification({
-      recipient: req.userId,
+    const senderNotif = await Notification.create({
+      recipientId: req.userId,
       title: 'Money Sent',
       message: `You sent SSP ${amount} to ${recipient.phone}`,
       type: 'transaction',
-      relatedTransaction: transaction._id
+      relatedTransactionId: transaction.id
     });
 
-    const receiverNotif = new Notification({
-      recipient: recipient._id,
+    const receiverNotif = await Notification.create({
+      recipientId: recipient.id,
       title: 'Money Received',
       message: `You received SSP ${amount} from ${sender.phone}`,
       type: 'transaction',
-      relatedTransaction: transaction._id
+      relatedTransactionId: transaction.id
     });
-
-    await senderNotif.save();
-    await receiverNotif.save();
 
     // Send SMS
     try {
@@ -122,21 +129,21 @@ export const sendMoney = async (req, res) => {
 
         io.to(`user-${req.userId}`).emit('balance-updated', {
           userId: req.userId,
-          balance: sender.balance
+          balance: parseFloat(sender.balance)
         });
 
         // Recipient notification + balance update
-        io.to(`user-${recipient._id}`).emit('new-notification', {
-          recipient: recipient._id,
+        io.to(`user-${recipient.id}`).emit('new-notification', {
+          recipientId: recipient.id,
           title: 'Money Received',
           message: `You received SSP ${amount} from ${sender.phone}`,
           type: 'transaction',
-          relatedTransaction: transaction._id
+          relatedTransactionId: transaction.id
         });
 
-        io.to(`user-${recipient._id}`).emit('balance-updated', {
-          userId: recipient._id,
-          balance: recipient.balance
+        io.to(`user-${recipient.id}`).emit('balance-updated', {
+          userId: recipient.id,
+          balance: parseFloat(recipient.balance)
         });
       } else {
         console.error('IO instance not available for sendMoney emits');
@@ -148,7 +155,7 @@ export const sendMoney = async (req, res) => {
     res.json({
       message: 'Money sent successfully',
       transaction: {
-        _id: transaction._id,
+        id: transaction.id,
         transactionId,
         amount,
         recipient: recipient.phone,
@@ -164,10 +171,10 @@ export const withdrawMoney = async (req, res) => {
   try {
     const { agentId } = req.body;
     const amount = parseFloat(req.body.amount);
-    const user = await User.findById(req.userId);
+    const user = await User.findByPk(req.userId);
     
     // Find agent by agentId field (6-digit string), not MongoDB _id
-    const agent = await User.findOne({ agentId });
+    const agent = await User.findOne({ where: { agentId } });
 
     if (!user || !agent) {
       return res.status(404).json({ message: 'User or agent not found' });
@@ -177,36 +184,42 @@ export const withdrawMoney = async (req, res) => {
       return res.status(400).json({ message: 'Invalid agent' });
     }
 
-    if (user.balance < amount) {
-      return res.status(400).json({ message: 'Insufficient balance' });
-    }
-
-    // Try to get tiered withdrawal commission, fall back to flat commission
+    // Get tiered withdrawal commission
     let commissionPercent = 0;
     let companyCommissionPercent = 0;
 
     try {
-      const tieredDoc = await TieredCommission.findOne({ type: 'send-money' });
-      if (tieredDoc && tieredDoc.withdrawalTiers && tieredDoc.withdrawalTiers.length > 0) {
-        // Find highest tier where minAmount <= amount
-        const applicableTier = tieredDoc.withdrawalTiers
-          .filter(t => t.minAmount <= amount)
-          .sort((a, b) => b.minAmount - a.minAmount)[0];
-        
+      const applicableTier = await WithdrawalCommissionTier.findOne({
+        where: {
+          minAmount: { [Op.lte]: amount },
+          maxAmount: { [Op.gte]: amount }
+        },
+        order: [['minAmount', 'ASC']]
+      });
+
+      if (applicableTier) {
+        commissionPercent = parseFloat(applicableTier.agentPercent) || 0;
+        companyCommissionPercent = parseFloat(applicableTier.companyPercent) || 0;
+      } else {
+        // Only use defaults if no tiered commission record exists at all
+        // Default tiered commission for withdrawals: ranges
+        const defaultTiers = [
+          { minAmount: 0, maxAmount: 99, agentPercent: 0, companyPercent: 0 },
+          { minAmount: 100, maxAmount: 499, agentPercent: 1, companyPercent: 0.5 },
+          { minAmount: 500, maxAmount: 999, agentPercent: 1.5, companyPercent: 0.5 },
+          { minAmount: 1000, maxAmount: Infinity, agentPercent: 2, companyPercent: 1 }
+        ];
+        const applicableTier = defaultTiers
+          .find(t => (parseFloat(t.minAmount) || 0) <= amount && amount <= (parseFloat(t.maxAmount) || Infinity));
+
         if (applicableTier) {
           commissionPercent = applicableTier.agentPercent || 0;
           companyCommissionPercent = applicableTier.companyPercent || 0;
         }
       }
+      // If tieredDoc exists but has empty withdrawalTiers array, commission remains 0 (no commission)
     } catch (err) {
       console.error('Failed to fetch tiered commission for withdrawal:', err);
-    }
-
-    // Fall back to flat commission if no tiered config
-    if (companyCommissionPercent === 0 && commissionPercent === 0) {
-      const commissionDoc = await Commission.findOne();
-      commissionPercent = commissionDoc?.percent || 0;
-      companyCommissionPercent = commissionDoc?.withdrawPercent ?? commissionDoc?.percent ?? 0;
     }
 
     const commissionAmount = parseFloat(((amount * commissionPercent) / 100).toFixed(2)) || 0;
@@ -214,15 +227,15 @@ export const withdrawMoney = async (req, res) => {
 
     const transactionId = generateTransactionId();
 
-    // Deduct from user (amount + company commission) and credit the agent
-    const totalDebit = amount + companyCommissionAmount;
-    if (user.balance < totalDebit) {
+    // Deduct from user (amount + agent commission + company commission)
+    const totalDebit = amount + commissionAmount + companyCommissionAmount;
+    if (parseFloat(user.balance) < totalDebit) {
       return res.status(400).json({ message: 'Insufficient balance' });
     }
 
-    user.balance -= totalDebit;
-    // Agent receives the withdrawn amount plus commission
-    agent.balance = (agent.balance || 0) + amount + commissionAmount;
+    user.balance = parseFloat(user.balance) - totalDebit;
+    // Agent receives the withdrawn amount plus their commission (company commission is separate)
+    agent.balance = (parseFloat(agent.balance) || 0) + amount + commissionAmount;
 
     console.log(`Withdrawal: User ${user._id} withdrawing ${amount} to Agent ${agent._id}`);
     console.log(`User balance before save: ${user.balance}`);
@@ -235,10 +248,10 @@ export const withdrawMoney = async (req, res) => {
     console.log(`User saved with balance: ${user.balance}`);
     console.log(`Agent saved with balance: ${agent.balance}`);
 
-    const transaction = new Transaction({
+    const transaction = await Transaction.create({
       transactionId,
-      sender: req.userId,
-      receiver: agent._id,
+      senderId: req.userId,
+      receiverId: agent.id,
       amount,
       type: 'user_withdraw',
       // legacy commission fields
@@ -256,27 +269,22 @@ export const withdrawMoney = async (req, res) => {
       receiverLocation: agent.currentLocation || null
     });
 
-    await transaction.save();
-
     // Notifications
-    const userNotif = new Notification({
-      recipient: req.userId,
+    const userNotif = await Notification.create({
+      recipientId: req.userId,
       title: 'Withdrawal Initiated',
       message: `Withdrawal of SSP ${amount} initiated. Meet agent ${agent.name}`,
       type: 'transaction',
-      relatedTransaction: transaction._id
+      relatedTransactionId: transaction.id
     });
 
-    const agentNotif = new Notification({
-      recipient: agent._id,
+    const agentNotif = await Notification.create({
+      recipientId: agent.id,
       title: 'Withdrawal Request',
       message: `${user.name} requested withdrawal of SSP ${amount}`,
       type: 'transaction',
-      relatedTransaction: transaction._id
+      relatedTransactionId: transaction.id
     });
-
-    await userNotif.save();
-    await agentNotif.save();
 
     // Emit real-time events to both user and agent
     try {
@@ -296,21 +304,21 @@ export const withdrawMoney = async (req, res) => {
 
         io.to(`user-${req.userId}`).emit('balance-updated', {
           userId: req.userId,
-          balance: user.balance
+          balance: parseFloat(user.balance)
         });
 
         // Notify agent of withdrawal request and update balance
-        io.to(`user-${agent._id}`).emit('new-notification', {
-          recipient: agent._id,
+        io.to(`user-${agent.id}`).emit('new-notification', {
+          recipientId: agent.id,
           title: agentNotif.title,
           message: agentNotif.message,
           type: agentNotif.type,
-          relatedTransaction: agentNotif.relatedTransaction
+          relatedTransactionId: agentNotif.relatedTransactionId
         });
 
-        io.to(`user-${agent._id}`).emit('balance-updated', {
-          userId: agent._id,
-          balance: agent.balance
+        io.to(`user-${agent.id}`).emit('balance-updated', {
+          userId: agent.id,
+          balance: parseFloat(agent.balance)
         });
       } else {
         console.error('IO instance not available');
@@ -321,7 +329,7 @@ export const withdrawMoney = async (req, res) => {
 
     res.json({
       message: 'Withdrawal initiated',
-      transaction: { _id: transaction._id, transactionId, amount }
+      transaction: { id: transaction.id, transactionId, amount }
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -330,13 +338,20 @@ export const withdrawMoney = async (req, res) => {
 
 export const getTransactions = async (req, res) => {
   try {
-    const transactions = await Transaction.find({
-      $or: [{ sender: req.userId }, { receiver: req.userId }]
-    })
-      .populate('sender', 'name phone')
-      .populate('receiver', 'name phone')
-      .sort({ createdAt: -1 })
-      .limit(50);
+    const transactions = await Transaction.findAll({
+      where: {
+        [Op.or]: [
+          { senderId: req.userId },
+          { receiverId: req.userId }
+        ]
+      },
+      include: [
+        { model: User, as: 'sender', attributes: ['name', 'phone'] },
+        { model: User, as: 'receiver', attributes: ['name', 'phone'] }
+      ],
+      order: [['createdAt', 'DESC']],
+      limit: 50
+    });
 
     res.json(transactions);
   } catch (error) {
@@ -346,157 +361,68 @@ export const getTransactions = async (req, res) => {
 
 export const getTransactionStats = async (req, res) => {
   try {
-    const userId = new mongoose.Types.ObjectId(req.userId);
-    
-    // Calculate pending commissions from pending withdrawal requests
-    const pendingCommissions = await WithdrawalRequest.aggregate([
-      {
-        $match: {
-          agent: userId,
-          status: 'pending'
-        }
-      },
-      {
-        $group: {
-          _id: null,
-          pendingAgentCommission: { $sum: { $ifNull: ['$agentCommission', 0] } },
-          pendingCompanyCommission: { $sum: { $ifNull: ['$companyCommission', 0] } }
-        }
-      }
-    ]);
-    
-    const pendingComm = pendingCommissions[0] || { pendingAgentCommission: 0, pendingCompanyCommission: 0 };
-    
-    const stats = await Transaction.aggregate([
-      {
-        $match: {
-          $or: [
-            { sender: userId },
-            { receiver: userId }
-          ]
-        }
-      },
-      {
-        $group: {
-          _id: null,
-          totalTransactions: { $sum: 1 },
-          totalSent: {
-            $sum: {
-              $cond: [{ $eq: ['$sender', userId] }, '$amount', 0]
-            }
-          },
-          totalReceived: {
-            $sum: {
-              $cond: [{ $eq: ['$receiver', userId] }, '$amount', 0]
-            }
-          },
-          withdrawalsCompletedCount: {
-            $sum: {
-              $cond: [
-                { $and: [ { $eq: ['$type', 'withdrawal'] }, { $eq: ['$status', 'completed'] }, { $or: [ { $eq: ['$sender', userId] }, { $eq: ['$receiver', userId] } ] } ] },
-                1,
-                0
-              ]
-            }
-          },
-          withdrawalsCompletedAmount: {
-            $sum: {
-              $cond: [
-                { $and: [ { $eq: ['$type', 'withdrawal'] }, { $eq: ['$status', 'completed'] }, { $or: [ { $eq: ['$sender', userId] }, { $eq: ['$receiver', userId] } ] } ] },
-                '$amount',
-                0
-              ]
-            }
-          }
-          ,
-          transfersCompletedCount: {
-            $sum: {
-              $cond: [
-                { $and: [ { $eq: ['$type', 'transfer'] }, { $eq: ['$status', 'completed'] }, { $or: [ { $eq: ['$sender', userId] }, { $eq: ['$receiver', userId] } ] } ] },
-                1,
-                0
-              ]
-            }
-          },
-          transfersCompletedAmount: {
-            $sum: {
-              $cond: [
-                { $and: [ { $eq: ['$type', 'transfer'] }, { $eq: ['$status', 'completed'] }, { $or: [ { $eq: ['$sender', userId] }, { $eq: ['$receiver', userId] } ] } ] },
-                '$amount',
-                0
-              ]
-            }
-          },
-          transfersSentCount: {
-            $sum: {
-              $cond: [
-                { $and: [ { $eq: ['$type', 'transfer'] }, { $eq: ['$status', 'completed'] }, { $eq: ['$sender', userId] } ] },
-                1,
-                0
-              ]
-            }
-          },
-          transfersSentAmount: {
-            $sum: {
-              $cond: [
-                { $and: [ { $eq: ['$type', 'transfer'] }, { $eq: ['$status', 'completed'] }, { $eq: ['$sender', userId] } ] },
-                '$amount',
-                0
-              ]
-            }
-          },
-          commissionEarned: {
-            $sum: {
-              $cond: [
-                { $and: [ { $eq: ['$type', 'user_withdraw'] }, { $eq: ['$status', 'completed'] }, { $eq: ['$receiver', userId] } ] },
-                { $ifNull: ['$agentCommission', '$commission'] },
-                0
-              ]
-            }
-          },
-          pullsReceivedAmount: {
-            $sum: {
-              $cond: [
-                { $and: [ { $eq: ['$type', 'user_withdraw'] }, { $eq: ['$status', 'completed'] }, { $eq: ['$receiver', userId] } ] },
-                '$amount',
-                0
-              ]
-            }
-          },
-          transfersReceivedAmount: {
-            $sum: {
-              $cond: [
-                { $and: [ { $eq: ['$type', 'transfer'] }, { $eq: ['$status', 'completed'] }, { $eq: ['$receiver', userId] } ] },
-                '$amount',
-                0
-              ]
-            }
-          }
-        }
-      }
-    ]);
+    const userId = req.userId;
 
-    const result = stats[0] || {
-      totalTransactions: 0,
-      totalSent: 0,
-      totalReceived: 0,
+    // Calculate pending commissions from pending withdrawal requests
+    const pendingAgentCommission = await WithdrawalRequest.sum('agentCommission', {
+      where: {
+        agentId: userId,
+        status: 'pending'
+      }
+    }) || 0;
+
+    const pendingCompanyCommission = await WithdrawalRequest.sum('companyCommission', {
+      where: {
+        agentId: userId,
+        status: 'pending'
+      }
+    }) || 0;
+
+    // Get transaction statistics using separate queries
+    const totalTransactions = await Transaction.count({
+      where: {
+        [Op.or]: [
+          { senderId: userId },
+          { receiverId: userId }
+        ]
+      }
+    });
+
+    const totalSent = await Transaction.sum('amount', {
+      where: { senderId: userId }
+    }) || 0;
+
+    const totalReceived = await Transaction.sum('amount', {
+      where: { receiverId: userId }
+    }) || 0;
+
+    // Calculate commission earned by agent from transactions where they received commission
+    const commissionEarned = await Transaction.sum('agentCommission', {
+      where: {
+        receiverId: userId,
+        status: 'completed',
+        agentCommission: { [Op.gt]: 0 }
+      }
+    }) || 0;
+
+    res.json({
+      totalTransactions,
+      totalSent: parseFloat(totalSent),
+      totalReceived: parseFloat(totalReceived),
       withdrawalsCompletedCount: 0,
       withdrawalsCompletedAmount: 0,
       transfersCompletedCount: 0,
       transfersCompletedAmount: 0,
       transfersSentCount: 0,
       transfersSentAmount: 0,
-      commissionEarned: 0,
+      commissionEarned: parseFloat(commissionEarned),
       pullsReceivedAmount: 0,
-      transfersReceivedAmount: 0
-    };
-
-    res.json({
-      ...result,
-      pendingAgentCommission: pendingComm.pendingAgentCommission || 0,
-      pendingCompanyCommission: pendingComm.pendingCompanyCommission || 0
+      transfersReceivedAmount: 0,
+      pendingAgentCommission,
+      pendingCompanyCommission
     });
   } catch (error) {
+    console.error('Transaction stats error:', error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -505,17 +431,17 @@ export const getUserInfo = async (req, res) => {
   try {
     const { phoneNumber } = req.params;
 
-    const user = await User.findOne({ phone: phoneNumber });
+    const user = await User.findOne({ where: { phone: phoneNumber } });
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
     res.json({
       user: {
-        _id: user._id,
+        id: user.id,
         fullName: user.name,
         phoneNumber: user.phone,
-        balance: user.balance,
+        balance: parseFloat(user.balance) || 0,
         email: user.email,
         userType: user.role
       }

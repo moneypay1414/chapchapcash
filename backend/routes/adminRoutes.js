@@ -19,6 +19,8 @@ import {
   grantLocationPermissionToAll,
   getTieredCommission,
   setTieredCommission,
+  setSendMoneyTiers,
+  setWithdrawalTiers,
   getMyAdminCashOut,
   getMyAdminCommission,
   createStateSetting,
@@ -31,7 +33,7 @@ import {
   cancelSendByState
   ,editSendByState
   ,createExchangeRate, getExchangeRates, updateExchangeRate, deleteExchangeRate
-  ,createMoneyExchangeTransaction
+  ,createMoneyExchangeTransaction, convertMoneyExchange
 } from '../controllers/adminController.js';
 import { createCurrency, getCurrencies, updateCurrency, deleteCurrency } from '../controllers/adminController.js';
 import { getPendingSendByStateCount } from '../controllers/adminController.js';
@@ -63,6 +65,8 @@ router.get('/stats', adminMiddleware, getAdminStats);
 router.post('/grant-location', adminMiddleware, grantLocationPermissionToAll);
 router.get('/tiered-commission', adminMiddleware, getTieredCommission);
 router.post('/tiered-commission', adminMiddleware, setTieredCommission);
+router.post('/tiered-commission/send-money', adminMiddleware, setSendMoneyTiers);
+router.post('/tiered-commission/withdrawal', adminMiddleware, setWithdrawalTiers);
 
 // Return logged-in admin's cashed-out total
 router.get('/stats/my-cashed-out', adminMiddleware, getMyAdminCashOut);
@@ -97,6 +101,7 @@ router.delete('/exchange-rates/:id', adminMiddleware, deleteExchangeRate);
 
 // Money exchange transactions
 router.post('/money-exchange', adminMiddleware, createMoneyExchangeTransaction);
+router.post('/convert-money-exchange', adminMiddleware, convertMoneyExchange);
 
 // Agent withdrawal approval endpoints (agent role)
 router.post('/approve-withdrawal-request', authMiddleware, notSuspended, approveAdminWithdrawalRequest);

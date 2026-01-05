@@ -58,7 +58,7 @@ export default function UserLayout() {
 
     // Connect to socket
     const socket = io('http://localhost:5000');
-    socket.emit('join-user', user?._id);
+    socket.emit('join-user', user?.id);
 
     socket.on('new-notification', (data) => {
       addNotification(data);
@@ -67,9 +67,9 @@ export default function UserLayout() {
     // Listen for balance updates and update auth store when relevant
     socket.on('balance-updated', (payload) => {
       try {
-        if (payload?.userId === user?._id) {
+        if (payload?.userId === user?.id) {
           // fetch current user object and update the store with new balance
-          const updated = { ...user, balance: payload.balance };
+          const updated = { ...user, balance: parseFloat(payload.balance) || 0 };
           // update local storage and zustand store
           localStorage.setItem('user', JSON.stringify(updated));
           // call store updater
@@ -82,7 +82,7 @@ export default function UserLayout() {
     });
 
     return () => socket.disconnect();
-  }, [user?._id]);
+  }, [user?.id]);
 
   // close mobile menu when clicking outside
   useEffect(() => {
