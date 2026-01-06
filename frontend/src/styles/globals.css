@@ -1,3 +1,14 @@
+/*
+Source - https://stackoverflow.com/a
+Posted by user3409468
+Retrieved 2026-01-06, License - CC BY-SA 3.0
+*/
+
+@font-face {
+  font-family: 'Droid Sans';
+  src: url('https://...fonts/DroidSans-webfont.eot');
+}
+
 :root {
   --primary: #2563eb;
   --primary-dark: #1e40af;
