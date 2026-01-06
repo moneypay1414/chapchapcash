@@ -1,6 +1,6 @@
 -- Create GCash Database
-CREATE DATABASE IF NOT EXISTS gcashdb;
-USE gcashdb;
+CREATE DATABASE IF NOT EXISTS mseet_40840416_chapchap;
+USE mseet_40840416_chapchap;
 
 -- Users table
 CREATE TABLE IF NOT EXISTS Users (

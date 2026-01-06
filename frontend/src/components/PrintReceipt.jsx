@@ -16,7 +16,32 @@ export default function PrintReceipt({ transaction, onClose }) {
     setTimeout(() => {
       document.body.classList.remove('printing-receipt');
     }, 1000);
-  };
+    const formatDate = (date) => {
+      return new Date(date).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      });
+    };
+    const getTransactionType = (type) => {
+      const types = {
+        send_money: 'Send Money',
+        receive_money: 'Receive Money',
+        withdraw: 'Withdrawal',
+        user_withdraw: 'User Withdrawal',
+        agent_cash_out_money: 'Admin Cash Out',
+        admin_push: 'Admin Push Money'
+      };
+      return types[type] || type;
+    };
+    const senderLocationHtml = transaction.senderLocation ? `<div class="receipt-row"><span class="label">From Location:</span><span class="value">${transaction.senderLocation.city || 'Unknown'}, ${transaction.senderLocation.country || 'Unknown'}</span></div>` : '';
+    const receiverLocationHtml = transaction.receiverLocation ? `<div class="receipt-row"><span class="label">To Location:</span><span class="value">${transaction.receiverLocation.city || 'Unknown'}, ${transaction.receiverLocation.country || 'Unknown'}</span></div>` : '';
+    const agentCommissionHtml = transaction.agentCommission !== undefined ? `<tr><td>Agent Commission (${transaction.agentCommissionPercent || 0}%)</td><td class="amount-cell">SSP ${ (parseFloat(transaction.agentCommission) || 0).toFixed(2) }</td></tr>` : '';
+    const companyCommissionHtml = transaction.companyCommission !== undefined ? `<tr><td>Company Commission (${transaction.companyCommissionPercent || 0}%)</td><td class="amount-cell">SSP ${ (parseFloat(transaction.companyCommission) || 0).toFixed(2) }</td></tr>` : '';
+    const descriptionHtml = transaction.description ? `<div class="receipt-row"><span class="label">Description:</span><span class="value">${transaction.description}</span></div>` : '';
     // Use hidden iframe for printing (works without popup permissions)
     const styles = `
   /* Inline print styles for A4 receipt - match browser display */
@@ -118,9 +143,9 @@ export default function PrintReceipt({ transaction, onClose }) {
           <div class="receipt-section">
             <h3>Parties</h3>
             <div class="receipt-row"><span class="label">From:</span><span class="value">${transaction.sender?.name || transaction.sender?.phone || 'System'}</span></div>
-            ${transaction.senderLocation ? `<div class="receipt-row"><span class="label">From Location:</span><span class="value">${transaction.senderLocation.city || 'Unknown'}, ${transaction.senderLocation.country || 'Unknown'}</span></div>` : ''}
+            ${senderLocationHtml}
             <div class="receipt-row"><span class="label">To:</span><span class="value">${transaction.receiver?.name || transaction.receiver?.phone || 'N/A'}</span></div>
-            ${transaction.receiverLocation ? `<div class="receipt-row"><span class="label">To Location:</span><span class="value">${transaction.receiverLocation.city || 'Unknown'}, ${transaction.receiverLocation.country || 'Unknown'}</span></div>` : ''}
+            ${receiverLocationHtml}
           </div>
 
           <div class="receipt-section">
@@ -131,12 +156,8 @@ export default function PrintReceipt({ transaction, onClose }) {
               </thead>
               <tbody>
                 <tr><td>Transaction Amount</td><td class="amount-cell">SSP ${ (parseFloat(transaction.amount) || 0).toFixed(2) }</td></tr>
-                ${transaction.agentCommission !== undefined ? `
-                  <tr><td>Agent Commission (${transaction.agentCommissionPercent || 0}%)</td><td class="amount-cell">SSP ${ (parseFloat(transaction.agentCommission) || 0).toFixed(2) }</td></tr>
-                ` : ''}
-                ${transaction.companyCommission !== undefined ? `
-                  <tr><td>Company Commission (${transaction.companyCommissionPercent || 0}%)</td><td class="amount-cell">SSP ${ (parseFloat(transaction.companyCommission) || 0).toFixed(2) }</td></tr>
-                ` : ''}
+                ${agentCommissionHtml}
+                ${companyCommissionHtml}
                 <tr><td><strong>Total Commission Fee</strong></td><td class="amount-cell"><strong>SSP ${ ((parseFloat(transaction.agentCommission)||0)+(parseFloat(transaction.companyCommission)||0)).toFixed(2) }</strong></td></tr>
                 <tr class="total-row"><td><strong>TOTAL USER PAYS</strong></td><td class="amount-cell"><strong>SSP ${ ((parseFloat(transaction.amount)||0) + (parseFloat(transaction.agentCommission)||0) + (parseFloat(transaction.companyCommission)||0)).toFixed(2) }</strong></td></tr>
               </tbody>
@@ -146,7 +167,7 @@ export default function PrintReceipt({ transaction, onClose }) {
           <div class="receipt-section">
             <h3>Status</h3>
             <div class="receipt-row"><span class="label">Status:</span><span class="value status-${transaction.status}">${(transaction.status || '').toUpperCase() || 'UNKNOWN'}</span></div>
-            ${transaction.description ? `<div class="receipt-row"><span class="label">Description:</span><span class="value">${transaction.description}</span></div>` : ''}
+            ${descriptionHtml}
           </div>
 
           <div class="receipt-footer"><p>Thank you for using MoneyPay</p><p class="print-instruction">Print this receipt for your records</p></div>
