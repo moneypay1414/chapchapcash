@@ -1,0 +1,45 @@
+.notification-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.notification-tab {
+  padding: 10px 15px;
+  border: 2px solid var(--border);
+  border-radius: 6px;
+  background: white;
+  cursor: pointer;
+  transition: var(--transition);
+  font-weight: 500;
+}
+
+.notification-tab.active {
+  border-color: var(--primary);
+  background-color: var(--primary);
+  color: white;
+}
+
+.notification-tab:hover {
+  border-color: var(--primary);
+}
+
+.notification-form {
+  margin-top: 20px;
+}
+
+.tips {
+  padding: 0;
+}
+
+.tips ul {
+  padding-left: 20px;
+  margin: 0;
+}
+
+.tips li {
+  margin-bottom: 15px;
+  line-height: 1.6;
+  color: var(--text);
+}

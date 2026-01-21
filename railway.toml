@@ -1,0 +1,19 @@
+[build]
+builder = "nixpacks"
+
+[build.nixpacks]
+providers = ["nodejs-yarn"]
+
+[environments.production]
+[environments.production.variables]
+NODE_ENV = "production"
+
+[[services]]
+name = "backend"
+rootDirectory = "backend"
+startCommand = "npm start"
+
+[[services]]
+name = "frontend"
+rootDirectory = "frontend"
+startCommand = "npm run build && npm run preview"

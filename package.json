@@ -1,0 +1,20 @@
+{
+  "name": "moneypay",
+  "version": "1.0.0",
+  "description": "MoneyPay Application",
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev --workspace=backend\" \"npm run dev --workspace=frontend\"",
+    "build": "npm run build --workspace=frontend",
+    "start": "concurrently \"npm start --workspace=backend\" \"npm run preview --workspace=frontend\""
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.0"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
