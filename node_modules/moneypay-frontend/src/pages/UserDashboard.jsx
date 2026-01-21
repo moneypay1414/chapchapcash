@@ -13,6 +13,7 @@ export default function UserDashboard() {
   const user = useAuthStore((state) => state.user);
   const updateUser = useAuthStore((state) => state.updateUser);
   const [stats, setStats] = useState(null);
+  const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedTransaction, setSelectedTransaction] = useState(null);
 
@@ -26,6 +27,10 @@ export default function UserDashboard() {
         // Fetch transaction stats
         const { data: statsData } = await transactionAPI.getStats();
         setStats(statsData);
+
+        // Fetch transactions for chart
+        const { data: transactionsData } = await transactionAPI.getTransactions();
+        setTransactions(transactionsData);
       } catch (error) {
         console.error('Failed to fetch dashboard data:', error);
       } finally {
@@ -36,27 +41,78 @@ export default function UserDashboard() {
     fetchData();
   }, [updateUser]);
 
-  const chartData = {
-    labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4'],
-    datasets: [
-      {
-        label: 'Sent (SSP)',
-        data: [5000, 7000, 6500, 8000],
-        borderColor: '#ef4444',
-        backgroundColor: 'rgba(239, 68, 68, 0.1)',
-        tension: 0.4,
-        fill: true
-      },
-      {
-        label: 'Received (SSP)',
-        data: [10000, 12000, 11500, 13000],
-        borderColor: '#10b981',
-        backgroundColor: 'rgba(16, 185, 129, 0.1)',
-        tension: 0.4,
-        fill: true
+  // Generate chart data from transactions
+  const generateChartData = () => {
+    const last30Days = [];
+    for (let i = 29; i >= 0; i--) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      last30Days.push(date.toISOString().split('T')[0]);
+    }
+
+    const sentByDay = {};
+    const receivedByDay = {};
+
+    last30Days.forEach(day => {
+      sentByDay[day] = 0;
+      receivedByDay[day] = 0;
+    });
+
+    transactions.forEach(tx => {
+      if (tx.createdAt) {
+        const txDate = new Date(tx.createdAt).toISOString().split('T')[0];
+        if (sentByDay.hasOwnProperty(txDate)) {
+          if (tx.senderId === user?.id) {
+            sentByDay[txDate] += parseFloat(tx.amount) || 0;
+          } else if (tx.receiverId === user?.id) {
+            receivedByDay[txDate] += parseFloat(tx.amount) || 0;
+          }
+        }
       }
-    ]
+    });
+
+    const labels = last30Days.map(d => {
+      const date = new Date(d);
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    });
+
+    const sentData = last30Days.map(day => sentByDay[day] || 0);
+    const receivedData = last30Days.map(day => receivedByDay[day] || 0);
+
+    return {
+      labels,
+      datasets: [
+        {
+          label: 'Sent (SSP)',
+          data: sentData,
+          borderColor: '#ef4444',
+          backgroundColor: 'rgba(239, 68, 68, 0.1)',
+          tension: 0.4,
+          fill: true,
+          pointBackgroundColor: '#ef4444',
+          pointBorderColor: '#fff',
+          pointBorderWidth: 2,
+          pointRadius: 4,
+          pointHoverRadius: 6
+        },
+        {
+          label: 'Received (SSP)',
+          data: receivedData,
+          borderColor: '#10b981',
+          backgroundColor: 'rgba(16, 185, 129, 0.1)',
+          tension: 0.4,
+          fill: true,
+          pointBackgroundColor: '#10b981',
+          pointBorderColor: '#fff',
+          pointBorderWidth: 2,
+          pointRadius: 4,
+          pointHoverRadius: 6
+        }
+      ]
+    };
   };
+
+  const chartData = generateChartData();
 
   const doughnutData = {
     labels: ['Transfers', 'Withdrawals', 'Others'],
@@ -122,13 +178,50 @@ export default function UserDashboard() {
       <div className="charts-grid grid-2">
         <div className="card">
           <div className="card-header">
-            <h3>Transaction History</h3>
+            <h3>Transaction History (Last 30 Days)</h3>
           </div>
           <div className="card-body">
             {loading ? (
               <p className="text-center text-muted">Loading chart...</p>
+            ) : transactions.length === 0 ? (
+              <p className="text-center text-muted">No transactions yet. Start by sending money!</p>
             ) : (
-              <Line data={chartData} options={{ responsive: true, maintainAspectRatio: true }} />
+              <Line 
+                data={chartData} 
+                options={{
+                  responsive: true,
+                  maintainAspectRatio: true,
+                  plugins: {
+                    legend: {
+                      position: 'top',
+                      labels: { boxWidth: 12, padding: 15 }
+                    },
+                    tooltip: {
+                      mode: 'index',
+                      intersect: false,
+                      backgroundColor: 'rgba(0,0,0,0.8)',
+                      padding: 12,
+                      titleFont: { size: 14, weight: 'bold' },
+                      bodyFont: { size: 13 },
+                      callbacks: {
+                        label: function(context) {
+                          return context.dataset.label + ': SSP ' + context.parsed.y.toFixed(2);
+                        }
+                      }
+                    }
+                  },
+                  scales: {
+                    y: {
+                      beginAtZero: true,
+                      ticks: {
+                        callback: function(value) {
+                          return 'SSP ' + value.toFixed(0);
+                        }
+                      }
+                    }
+                  }
+                }}
+              />
             )}
           </div>
         </div>

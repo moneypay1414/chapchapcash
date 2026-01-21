@@ -21,7 +21,7 @@ export default function AdminTopup() {
     setChecking(true);
 
     try {
-      const response = await fetch(`http://localhost:5000/api/auth/check-balance?phone=${encodeURIComponent(phone)}`, {
+      const response = await fetch(`http://localhost:5002/api/auth/check-balance?phone=${encodeURIComponent(phone)}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
@@ -84,7 +84,7 @@ export default function AdminTopup() {
         return;
       }
 
-      const response = await fetch('http://localhost:5000/api/admin/topup-user', {
+      const response = await fetch('http://localhost:5002/api/admin/topup-user', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
