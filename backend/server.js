@@ -26,7 +26,8 @@ const httpServer = createServer(app);
 // and also read from FRONTEND_URL env var if set
 const allowedOrigins = [
   'http://localhost:5173',
-  'http://localhost:5174'
+  'http://localhost:5174',
+  'http://a8cosos0ogw80cw0skgk0kc8.127.0.0.1.sslip.io'
 ];
 if (process.env.FRONTEND_URL && !allowedOrigins.includes(process.env.FRONTEND_URL)) {
   allowedOrigins.push(process.env.FRONTEND_URL);
