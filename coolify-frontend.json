@@ -1,0 +1,16 @@
+{
+  "deploymentType": "static",
+  "name": "GCash Frontend",
+  "description": "Money transfer application frontend UI",
+  "ports": [
+    {
+      "port": 5173,
+      "protocol": "http"
+    }
+  ],
+  "buildCommand": "cd frontend && npm install && npm run build",
+  "staticFolder": "frontend/dist",
+  "environment": {
+    "VITE_API_URL": "http://a8cosos0ogw80cw0skgk0kc8.127.0.0.1.sslip.io:5002/api"
+  }
+}

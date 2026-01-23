@@ -11,5 +11,8 @@ export default defineConfig({
         changeOrigin: true
       }
     }
+  },
+  define: {
+    'process.env.VITE_API_URL': JSON.stringify(process.env.VITE_API_URL || 'http://a8cosos0ogw80cw0skgk0kc8.127.0.0.1.sslip.io:5002/api')
   }
 });
