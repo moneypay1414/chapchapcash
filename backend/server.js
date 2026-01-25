@@ -143,8 +143,9 @@ app.post('/api/admin/verify', (req, res) => {
 });
 const PORT = process.env.PORT || 5000;
 
-httpServer.listen(PORT, () => {
+httpServer.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
+  console.log(`Healthcheck endpoint: http://0.0.0.0:${PORT}/api/health`);
 });
 
 export { io };
