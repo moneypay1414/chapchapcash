@@ -23,22 +23,14 @@ const app = express();
 const httpServer = createServer(app);
 
 // Allow both common frontend ports for development (5173, 5174)
-// and also read from FRONTEND_URL, API_URL, and API_PRODUCTION_URL env vars if set
+// and also read from FRONTEND_URL env var if set
 const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:5174',
   'http://a8cosos0ogw80cw0skgk0kc8.127.0.0.1.sslip.io'
 ];
-
-// Add production URLs from environment variables
 if (process.env.FRONTEND_URL && !allowedOrigins.includes(process.env.FRONTEND_URL)) {
   allowedOrigins.push(process.env.FRONTEND_URL);
-}
-if (process.env.API_URL && !allowedOrigins.includes(process.env.API_URL)) {
-  allowedOrigins.push(process.env.API_URL);
-}
-if (process.env.API_PRODUCTION_URL && !allowedOrigins.includes(process.env.API_PRODUCTION_URL)) {
-  allowedOrigins.push(process.env.API_PRODUCTION_URL);
 }
 
 const io = new SocketIOServer(httpServer, {
